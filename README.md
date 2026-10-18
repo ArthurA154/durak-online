@@ -1,6 +1,6 @@
 # Durak online
 
-Das russische Kartenspiel **Durak** im Browser – für 2 bis 4 Spieler, Variante *Perevodnoy* (mit Weiterschieben).
+Das russische Kartenspiel **Durak** im Browser – für 2 bis 4 Spieler, Variante _Perevodnoy_ (mit Weiterschieben).
 
 ### ▶️ Jetzt spielen: **https://arthura154.github.io/durak-online/**
 
@@ -18,24 +18,13 @@ Raum erstellen, Code oder Link an die Freunde schicken, loslegen. Läuft am Hand
 
 ## Technik
 
-| Teil | Stack |
-|---|---|
-| Frontend | React 18, TypeScript, Vite, Framer Motion, Web Animations API, Web Audio (Musik und Sounds werden im Browser erzeugt, ohne Audiodateien) |
-| Backend | Node.js 20, TypeScript, Socket.IO – die Spiellogik läuft komplett auf dem Server: Er mischt, teilt aus und prüft jeden Zug, und jeder Spieler sieht nur seine eigenen Karten |
-| Gemeinsam | `shared/`: Typen, Regeln und Übersetzungen für Frontend und Backend (npm workspaces) |
-| Tests | Vitest |
-| Betrieb | Frontend auf GitHub Pages (GitHub Actions), Backend als Docker-Container hinter Caddy |
-
-## Lokal starten
-
-```bash
-npm install
-npm run dev:backend    # Server auf http://localhost:3002
-npm run dev:frontend   # Spiel auf http://localhost:5173
-npm test               # Tests
-```
-
-Zum Ausprobieren mit zwei Spielern auf einem Rechner: ein normales und ein privates Browserfenster öffnen.
+| Teil      | Stack                                                                                                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend  | React 18, TypeScript, Vite, Framer Motion, Web Animations API, Web Audio (Musik und Sounds werden im Browser erzeugt, ohne Audiodateien)                                     |
+| Backend   | Node.js 20, TypeScript, Socket.IO – die Spiellogik läuft komplett auf dem Server: Er mischt, teilt aus und prüft jeden Zug, und jeder Spieler sieht nur seine eigenen Karten |
+| Gemeinsam | `shared/`: Typen, Regeln und Übersetzungen für Frontend und Backend (npm workspaces)                                                                                         |
+| Tests     | Vitest                                                                                                                                                                       |
+| Betrieb   | Frontend auf GitHub Pages (GitHub Actions), Backend als Docker-Container hinter Caddy                                                                                        |
 
 ## Entstehung
 
