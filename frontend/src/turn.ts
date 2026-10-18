@@ -10,7 +10,7 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
   const isDefender = view.defenderId === me;
   if (view.phase !== 'playing') return { text: '', mine: false };
   if (view.players.find((p) => p.id === me)?.out) {
-    return { text: 'Du bist kein Durak! Schau zu, wer es wird.', mine: false };
+    return { text: 'Du bist raus – schau zu, wer Durak wird.', mine: false };
   }
 
   if (view.table.length === 0) {

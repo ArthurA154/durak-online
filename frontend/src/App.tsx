@@ -5,6 +5,7 @@ import { Home } from './Home';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
 import { AudioToggles } from './AudioToggles';
+import { Leaderboard } from './Leaderboard';
 import { useGameSounds } from './useGameSounds';
 
 /** Pro Verbindung nur einmal wiederverbinden (sonst kam es doppelt beim Server an) */
@@ -16,6 +17,8 @@ export function App() {
   const [connectError, setConnectError] = useState('');
   // „Verbinde …“ erst zeigen, wenn es länger dauert (sonst flackert es bei jedem Laden)
   const [slow, setSlow] = useState(false);
+  // Nachricht vom Betreiber (z. B. „Server startet gleich neu“)
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const onConnect = () => {
@@ -37,6 +40,8 @@ export function App() {
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
     socket.on('state', setView);
+    const onNotice = (n: { text: string } | null) => setNotice(n?.text ?? null);
+    socket.on('notice', onNotice);
     if (socket.connected) onConnect();
     const slowTimer = window.setTimeout(() => setSlow(true), 2500);
     return () => {
@@ -45,6 +50,7 @@ export function App() {
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
       socket.off('state', setView);
+      socket.off('notice', onNotice);
     };
   }, []);
 
@@ -63,7 +69,14 @@ export function App() {
   return (
     <div className={`app${inGame ? ' in-game' : ''}`}>
       <header className="topbar">
-        {view ? <span className="wordmark">Дурак</span> : <span />}
+        {view ? (
+          <div className="topbar-left">
+            <span className="wordmark">Дурак</span>
+            <Leaderboard view={view} />
+          </div>
+        ) : (
+          <span />
+        )}
         <div className="topbar-right">
           <AudioToggles />
           {view && (
@@ -76,6 +89,14 @@ export function App() {
       {!connected && (connectError || slow) && (
         <div className="conn-banner" role="alert">
           {connectError || 'Verbinde mit dem Server …'}
+        </div>
+      )}
+      {notice && (
+        <div className="notice-banner" role="status">
+          <span>📢 {notice}</span>
+          <button type="button" aria-label="Schliessen" onClick={() => setNotice(null)}>
+            ×
+          </button>
         </div>
       )}
       {!view && <Home />}

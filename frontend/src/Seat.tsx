@@ -26,7 +26,6 @@ interface Props {
   offline?: boolean;
   out?: boolean;
   cardCount?: number;
-  durakCount?: number;
   note?: string;
   /** Sichtbarer Zug-Countdown (letzte 10 s) */
   countdown?: { seconds: number; fraction: number } | null;
@@ -35,7 +34,7 @@ interface Props {
 /** Ein Platz am Tisch mit Figur, Name, Kartenfächer und Status. */
 export function Seat(props: Props) {
   const { pos, id, name = '', color = 0, expression, hat, empty, role, done, offline, out } = props;
-  const { cardCount, durakCount = 0, note, countdown } = props;
+  const { cardCount, note, countdown } = props;
   const classes = [
     'seat',
     `pos-${pos}`,
@@ -79,16 +78,7 @@ export function Seat(props: Props) {
         {cardCount !== undefined && !out && <span className="avatar-badge count">{cardCount}</span>}
       </div>
       <div className="seat-name">{empty ? 'frei' : name}</div>
-      {(note || durakCount > 0) && (
-        <div className="seat-note">
-          {note}
-          {durakCount > 0 && (
-            <span className="durak-count" title={`${durakCount}× Durak`}>
-              {note ? ' · ' : ''}🃏 {durakCount}
-            </span>
-          )}
-        </div>
-      )}
+      {note && <div className="seat-note">{note}</div>}
     </div>
   );
 }

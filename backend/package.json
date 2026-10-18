@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/server.js --external:bufferutil --external:utf-8-validate --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\"",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/server.js --external:bufferutil --external:utf-8-validate --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" && node -e \"require('fs').cpSync('src/admin-ui','dist/admin-ui',{recursive:true})\"",
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc -p ."

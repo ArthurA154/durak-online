@@ -62,6 +62,96 @@ body {
   gap: 12px;
 }
 
+.topbar-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Durak-Zähler oben links */
+.leaderboard {
+  position: relative;
+  z-index: 30;
+}
+
+.leaderboard-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--room-light);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.leaderboard-toggle:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.leaderboard-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.leaderboard-caret {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.leaderboard-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 170px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 12px;
+  background: rgba(19, 23, 38, 0.92);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+.leaderboard-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.leaderboard-list li.is-me {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-count {
+  color: var(--yellow);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.avatar.tiny {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  box-shadow: none;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -474,12 +564,6 @@ input:focus {
     translate: 0 -30px;
     opacity: 0;
   }
-}
-
-.durak-count {
-  color: var(--text);
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 /* Figur-Editor auf der Startseite */
@@ -1440,11 +1524,6 @@ input:focus {
   color: var(--yellow);
 }
 
-.me-chip .durak-count {
-  font-size: 0.85rem;
-  margin-left: 2px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .figure-eyes,
   .figure-hat,
@@ -1494,6 +1573,39 @@ input:focus {
 }
 
 /* ---------- Verbindung ---------- */
+
+.notice-banner {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 99;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 18px;
+  border-radius: 18px;
+  background: var(--yellow);
+  color: #1b1600;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.notice-banner button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
 
 .conn-banner {
   position: fixed;

@@ -37,6 +37,19 @@ export interface Room {
   round: number;
   /** Ergebnis der aktuellen Partie schon gezählt? */
   resultRecorded: boolean;
+  createdAt: number;
+  /** Start der aktuellen Partie und wer da mitgespielt hat (für die Statistik) */
+  gameStartedAt: number | null;
+  gamePlayers: string[];
+}
+
+export type GameOutcome = 'durak' | 'draw' | 'aborted';
+
+/** Für die Admin-Statistik: was in den Räumen passiert. */
+export interface RoomEvents {
+  roomCreated?(room: Room): void;
+  gameStarted?(room: Room): void;
+  gameEnded?(room: Room, outcome: GameOutcome, durakName: string | null): void;
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -45,6 +58,13 @@ const isRunning = (room: Room) => !!room.game && !room.game.finished;
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
+
+  constructor(private events: RoomEvents = {}) {}
+
+  /** Alle Räume (nur lesen – für die Admin-Übersicht) */
+  all(): IterableIterator<Room> {
+    return this.rooms.values();
+  }
 
   get(code: string): Room | undefined {
     return this.rooms.get(code.toUpperCase());
@@ -73,8 +93,12 @@ export class RoomManager {
       dealerId: null,
       round: 0,
       resultRecorded: false,
+      createdAt: Date.now(),
+      gameStartedAt: null,
+      gamePlayers: [],
     };
     this.rooms.set(code, room);
+    this.events.roomCreated?.(room);
     return { room, session: sessionOf(room, player) };
   }
 
@@ -119,6 +143,9 @@ export class RoomManager {
     room.dealerId = durak;
     room.round++;
     room.resultRecorded = false;
+    room.gameStartedAt = Date.now();
+    room.gamePlayers = room.players.map((p) => p.name);
+    this.events.gameStarted?.(room);
   }
 
   /** Nach jedem Zug aufrufen: zählt das Ergebnis einer beendeten Partie genau einmal. */
@@ -129,6 +156,9 @@ export class RoomManager {
     room.lastDurakId = g.durakId;
     const durak = room.players.find((p) => p.id === g.durakId);
     if (durak) durak.durakCount++;
+    // Nur noch einer übrig, weil die anderen gegangen sind → abgebrochen, nicht unentschieden
+    const outcome: GameOutcome = durak ? 'durak' : g.players.length < 2 ? 'aborted' : 'draw';
+    this.events.gameEnded?.(room, outcome, durak?.name ?? null);
   }
 
   /**
@@ -195,6 +225,7 @@ export class RoomManager {
         if (ghosts.length) changed.push(room);
       }
       if (room.players.length === 0 || (room.emptySince && now - room.emptySince > maxIdleMs)) {
+        if (isRunning(room)) this.events.gameEnded?.(room, 'aborted', null);
         this.clearTimer(room);
         this.rooms.delete(code);
       }

@@ -54,7 +54,6 @@ export function Lobby({ view }: { view: GameView }) {
               color={p.color}
               expression="happy"
               hat={p.id === view.lastDurakId}
-              durakCount={p.durakCount}
               offline={!p.connected}
               note={[p.id === view.you && 'du', p.id === view.hostId && 'Gastgeber'].filter(Boolean).join(', ') || undefined}
             />

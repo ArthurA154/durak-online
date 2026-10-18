@@ -165,23 +165,84 @@ describe('Spielende', () => {
   it('wer zuletzt Karten hat, ist der Durak', () => {
     const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
     g.deck = [];
-    g.players[0].hand = [c(7, 'S')];
-    g.players[1].hand = [c(9, 'S'), c(6, 'H')];
+    g.players[0].hand = [c(7, 'S'), c(6, 'H')];
+    g.players[1].hand = [c(9, 'S')];
     g.attack('a', c(7, 'S'));
+    // b schlägt mit seiner letzten Karte → sofort vorbei, a muss nicht erst „Fertig“ drücken
     g.defend('b', 0, c(9, 'S'));
     expect(g.finished).toBe(true);
-    expect(g.durakId).toBe('b');
+    expect(g.durakId).toBe('a');
   });
 
-  it('Unentschieden, wenn beide gleichzeitig keine Karten mehr haben', () => {
+  it('letzte Karte gelegt: der andere ist sofort der Durak, ohne weiteren Zug', () => {
+    const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
+    g.deck = [];
+    g.players[0].hand = [c(7, 'S')];
+    g.players[1].hand = [c(6, 'H')];
+    g.attack('a', c(7, 'S'));
+    // b kann 7♠ mit 6♥ nicht schlagen → kein Unentschieden möglich
+    expect(g.finished).toBe(true);
+    expect(g.durakId).toBe('b');
+    expect(g.table).toEqual([]);
+  });
+
+  it('Unentschieden: letzte Karte wird mit der letzten Karte geschlagen', () => {
     const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
     g.deck = [];
     g.players[0].hand = [c(7, 'S')];
     g.players[1].hand = [c(9, 'S')];
     g.attack('a', c(7, 'S'));
+    expect(g.finished).toBe(false);
+    expect(g.waitingOn()).toEqual(['b']);
     g.defend('b', 0, c(9, 'S'));
     expect(g.finished).toBe(true);
     expect(g.durakId).toBeNull();
+  });
+
+  it('Unentschieden möglich, aber geschluckt → Durak', () => {
+    const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
+    g.deck = [];
+    g.players[0].hand = [c(7, 'S')];
+    g.players[1].hand = [c(9, 'S')];
+    g.attack('a', c(7, 'S'));
+    g.take('b');
+    expect(g.finished).toBe(true);
+    expect(g.durakId).toBe('b');
+  });
+
+  it('Unentschieden mit zwei Karten nur, wenn beide geschlagen werden können', () => {
+    const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
+    g.deck = [];
+    g.players[0].hand = [c(7, 'S'), c(7, 'H')];
+    g.players[1].hand = [c(6, 'C'), c(9, 'H')];
+    g.attack('a', c(7, 'S'));
+    expect(g.finished).toBe(false); // b hat noch 2 Karten, a noch eine
+    g.attack('a', c(7, 'H'));
+    expect(g.finished).toBe(false); // 6♣ (Trumpf) schlägt 7♠, 9♥ schlägt 7♥
+    g.defend('b', 1, c(9, 'H'));
+    g.defend('b', 0, c(6, 'C'));
+    expect(g.durakId).toBeNull();
+    expect(g.finished).toBe(true);
+  });
+
+  it('bei 3 Spielern geht es weiter, wenn noch zwei Karten haben', () => {
+    const g = new DurakGame(['a', 'b', 'c'], rigDeck([handA, handB, handC], c(14, 'C')));
+    g.deck = [];
+    g.players[0].hand = [c(7, 'S')];
+    g.attack('a', c(7, 'S'));
+    expect(g.finished).toBe(false);
+  });
+
+  it('Weiterschieben mit der letzten Karte beendet das Spiel ebenfalls', () => {
+    const g = new DurakGame(['a', 'b'], rigDeck([handA, handB], c(14, 'C')));
+    g.deck = [];
+    g.players[0].hand = [c(7, 'S'), c(8, 'H'), c(10, 'H')];
+    g.players[1].hand = [c(7, 'H')];
+    g.attack('a', c(7, 'S'));
+    // b schiebt mit seiner letzten Karte zurück an a → b ist raus, a ist der Durak
+    g.transfer('b', c(7, 'H'));
+    expect(g.finished).toBe(true);
+    expect(g.durakId).toBe('a');
   });
 
   it('ausgeschiedene Spieler werden übersprungen', () => {

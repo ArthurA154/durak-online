@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Durak Admin</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800;900&family=Manrope:wght@500;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="/admin/admin.css" />
+    <script src="/admin/admin.js" defer></script>
+  </head>
+  <body>
+    <!-- Anmeldung -->
+    <main id="login" class="login" hidden>
+      <form id="login-form" class="login-table">
+        <span class="wordmark">Дурак</span>
+        <label for="password">Admin-Passwort</label>
+        <input id="password" type="password" autocomplete="current-password" required autofocus />
+        <button type="submit" class="btn">Einloggen</button>
+        <p id="login-error" class="login-error" role="alert"></p>
+      </form>
+    </main>
+
+    <!-- Übersicht -->
+    <div id="app" hidden>
+      <header class="top">
+        <span class="wordmark">Дурак <small>admin</small></span>
+        <span id="live" class="live" aria-live="polite"><i></i><span>live</span></span>
+        <button id="logout" type="button" class="btn ghost">Abmelden</button>
+      </header>
+
+      <section class="headline" aria-label="Jetzt">
+        <div class="big"><b id="n-online">–</b><span>online</span></div>
+        <div class="big"><b id="n-games">–</b><span>Spiele laufen</span></div>
+        <div class="big"><b id="n-lobbies">–</b><span>Lobbys warten</span></div>
+        <div class="big"><b id="n-today">–</b><span>Spiele heute</span></div>
+      </section>
+
+      <section class="block">
+        <h2>Tische <span id="tables-note" class="dim"></span></h2>
+        <div id="tables" class="tables"></div>
+      </section>
+
+      <div class="cols">
+        <section class="block">
+          <h2>Letzte 30 Tage</h2>
+          <div class="legend">
+            <span><i class="sw started"></i>gestartet</span>
+            <span><i class="sw finished"></i>fertig gespielt</span>
+            <span><i class="sw visitors"></i>Besucher</span>
+          </div>
+          <div id="days-chart" class="chart" role="img" aria-label="Spiele und Besucher pro Tag"></div>
+          <dl id="totals" class="facts"></dl>
+        </section>
+
+        <section class="block">
+          <h2>Server</h2>
+          <div id="meters" class="meters"></div>
+          <h3>Letzte Stunde</h3>
+          <div class="legend">
+            <span><i class="sw cpu"></i>CPU Backend</span>
+            <span><i class="sw online"></i>online</span>
+          </div>
+          <div id="hour-chart" class="chart small" role="img" aria-label="CPU und Online in der letzten Stunde"></div>
+          <dl id="sysfacts" class="facts"></dl>
+        </section>
+      </div>
+
+      <div class="cols">
+        <section class="block">
+          <h2>Letzte Spiele</h2>
+          <ol id="games" class="games"></ol>
+        </section>
+
+        <section class="block">
+          <h2>Nachricht an alle</h2>
+          <form id="notice-form" class="notice-form">
+            <input id="notice-text" maxlength="200" placeholder="z. B. Server startet in 5 Minuten neu" />
+            <button type="submit" class="btn">Senden</button>
+          </form>
+          <p id="notice-current" class="notice-current"></p>
+
+          <h2 class="spaced">Fehler</h2>
+          <ol id="errors" class="errors"></ol>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

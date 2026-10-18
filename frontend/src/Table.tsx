@@ -177,7 +177,7 @@ export function Table({ view }: { view: GameView }) {
       if (!p.out || !before || before.out) continue;
       const at = p.id === me ? pointOf('.me-chip .avatar') : seatPoint(p.id);
       if (at) setBursts((b) => [...b, { id: Math.random(), at }]);
-      setBanner(p.id === me ? 'Du bist kein Durak! 🎉' : `${p.name} ist kein Durak! 🎉`);
+      setBanner(p.id === me ? 'Du bist raus! 🎉' : `${p.name} ist raus! 🎉`);
     }
     if (prev.phase === 'playing' && finished && view.durakId !== me) {
       const at = pointOf('.arena');
@@ -439,11 +439,10 @@ export function Table({ view }: { view: GameView }) {
             offline={!p.connected}
             out={p.out}
             cardCount={p.cardCount}
-            durakCount={p.durakCount}
             countdown={timedFor(p.id)}
             note={
               p.out
-                ? 'kein Durak'
+                ? 'raus'
                 : !p.connected
                   ? 'Raucherpause 🚬'
                   : p.id === view.attackerId
@@ -472,7 +471,6 @@ export function Table({ view }: { view: GameView }) {
               />
             </span>
             {meInfo?.name}
-            {!!meInfo?.durakCount && <span className="durak-count">🃏 {meInfo.durakCount}</span>}
           </div>
           {myCountdown ? (
             <p className="turn-text my-timer" role="timer">

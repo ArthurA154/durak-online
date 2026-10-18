@@ -202,12 +202,7 @@ export class DurakGame {
     this.attackerIdx = this.firstActiveFrom(idx % this.players.length);
     this.defenderIdx = this.nextActive(this.attackerIdx);
     this.refillHands();
-    const withCards = this.players.filter((p) => p.hand.length > 0);
-    if (this.deck.length === 0 && withCards.length <= 1) {
-      this.finished = true;
-      this.durakId = withCards[0]?.id ?? null;
-      return;
-    }
+    if (this.finishIfOver()) return;
     this.attackerIdx = this.firstActiveFrom(this.attackerIdx);
     this.defenderIdx = this.nextActive(this.attackerIdx);
   }
@@ -251,6 +246,22 @@ export class DurakGame {
   // ---------- Ablauf ----------
 
   private checkBoutEnd(): void {
+    // Stapel leer und nur noch einer hat Karten → sofort Schluss, der ist der Durak.
+    // Ausnahme: Er verteidigt und kann alles mit seinen letzten Karten schlagen → er darf es
+    // versuchen; schafft er es, ist es unentschieden.
+    if (
+      this.deck.length === 0 &&
+      this.players.filter((p) => p.hand.length > 0).length <= 1 &&
+      !this.canStillDraw()
+    ) {
+      const cards = this.table.reduce((n, t) => n + (t.defense ? 2 : 1), 0);
+      this.discardCount += cards;
+      this.table = [];
+      this.taking = false;
+      this.passed.clear();
+      this.finishIfOver();
+      return;
+    }
     const undefended = this.table.filter((t) => !t.defense).length;
     if (undefended > 0 && !this.taking) {
       // Verteidiger ist dran – außer er hat keine Karten mehr (kann nicht passieren, da Limit).
@@ -279,17 +290,37 @@ export class DurakGame {
     this.passed.clear();
     this.refillHands();
 
-    const withCards = this.players.filter((p) => p.hand.length > 0);
-    if (this.deck.length === 0 && withCards.length <= 1) {
-      this.finished = true;
-      this.durakId = withCards[0]?.id ?? null;
-      return;
-    }
+    if (this.finishIfOver()) return;
 
     this.attackerIdx = tookCards
       ? this.nextActive(this.defenderIdx)
       : this.firstActiveFrom(this.defenderIdx);
     this.defenderIdx = this.nextActive(this.attackerIdx);
+  }
+
+  /** Kann der Verteidiger mit genau seinen restlichen Karten alles Offene schlagen? */
+  private canStillDraw(): boolean {
+    const d = this.defender;
+    if (this.taking || d.hand.length === 0) return false;
+    const open = this.table.filter((t) => !t.defense).map((t) => t.attack);
+    if (open.length !== d.hand.length) return false;
+    const match = (attacks: Card[], hand: Card[]): boolean =>
+      attacks.length === 0 ||
+      hand.some(
+        (card, i) =>
+          beats(attacks[0], card, this.trump) &&
+          match(attacks.slice(1), hand.filter((_, j) => j !== i)),
+      );
+    return match(open, d.hand);
+  }
+
+  /** Stapel leer und höchstens einer hat noch Karten → Spiel vorbei. */
+  private finishIfOver(): boolean {
+    const withCards = this.players.filter((p) => p.hand.length > 0);
+    if (this.deck.length > 0 || withCards.length > 1) return false;
+    this.finished = true;
+    this.durakId = withCards[0]?.id ?? null;
+    return true;
   }
 
   /** Nachziehen: Angreifer zuerst, dann reihum, Verteidiger zuletzt. */

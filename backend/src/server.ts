@@ -1,9 +1,13 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
+import { AVATAR_COLORS } from '@durak/shared';
 import { Server, type Socket } from 'socket.io';
 import type { ClientToServerEvents, Result, ServerToClientEvents } from '@durak/shared';
 import { GameError } from './game/durak.js';
 import { ConnectionCounter, RateLimiter } from './limits.js';
 import { RoomManager, viewFor, type Room } from './rooms.js';
+import { createAdmin } from './admin.js';
+import { Stats } from './stats.js';
+import { SystemMonitor } from './system.js';
 
 const PORT = Number(process.env.PORT ?? 3002);
 const CORS_ORIGIN = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
@@ -13,6 +17,8 @@ const CORS_ORIGIN = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
 /** Hinter Caddy: echte Client-IP steht in X-Forwarded-For */
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const ROOM_IDLE_MS = 30 * 60 * 1000;
+const DATA_DIR = process.env.DATA_DIR ?? 'data';
+const STARTED_AT = Date.now();
 
 interface SocketData {
   roomCode?: string;
@@ -27,14 +33,34 @@ const http = createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
     return;
   }
-  res.writeHead(404).end();
+  admin(req, res)
+    .then((handled) => {
+      if (!handled) res.writeHead(404).end();
+    })
+    .catch((err) => {
+      stats.error(String(err?.stack ?? err));
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
 });
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents, object, SocketData>(http, {
   cors: { origin: CORS_ORIGIN },
   maxHttpBufferSize: 10_000, // Nachrichten sind winzig – große Pakete gar nicht erst annehmen
 });
-const rooms = new RoomManager();
+const stats = new Stats(`${DATA_DIR}/stats.json`);
+const rooms = new RoomManager({
+  roomCreated: () => stats.roomCreated(),
+  gameStarted: (room) => stats.gameStarted(room.players.length),
+  gameEnded: (room, outcome, durak) =>
+    stats.gameEnded({
+      at: Date.now(),
+      durationMs: room.gameStartedAt ? Date.now() - room.gameStartedAt : 0,
+      players: room.gamePlayers,
+      durak,
+      outcome,
+    }),
+});
 
 // Schutz gegen Missbrauch: Verbindungen und neue Räume pro IP begrenzen
 const connections = new ConnectionCounter(20);
@@ -42,17 +68,26 @@ const createLimit = new RateLimiter(10, 60_000);
 const joinLimit = new RateLimiter(30, 60_000);
 
 function clientIp(socket: IoSocket): string {
+  return ipFrom(socket.handshake.headers['x-forwarded-for'], socket.handshake.address);
+}
+
+function ipFrom(xff: string | string[] | undefined, address: string | undefined): string {
   if (TRUST_PROXY) {
-    const xff = socket.handshake.headers['x-forwarded-for'];
     const first = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim();
     if (first) return first;
   }
-  return socket.handshake.address;
+  return address ?? '';
 }
+
+const httpIp = (req: IncomingMessage) => ipFrom(req.headers['x-forwarded-for'], req.socket.remoteAddress);
 
 io.use((socket, next) => {
   const ip = clientIp(socket);
-  if (!connections.open(ip)) return next(new Error('Zu viele Verbindungen von deiner Adresse'));
+  if (!connections.open(ip)) {
+    stats.limited();
+    return next(new Error('Zu viele Verbindungen von deiner Adresse'));
+  }
+  stats.connection(ip);
   socket.data.ip = ip;
   socket.on('disconnect', () => connections.close(ip));
   next();
@@ -67,6 +102,7 @@ function broadcast(room: Room): void {
 function fail(err: unknown): { ok: false; error: string } {
   if (err instanceof GameError) return { ok: false, error: err.message };
   console.error(err);
+  stats.error(String((err as Error)?.stack ?? err));
   return { ok: false, error: 'Interner Fehler' };
 }
 
@@ -89,6 +125,7 @@ function inRoom(socket: IoSocket, ack: (r: Result) => void, action: (room: Room,
 
 io.on('connection', (socket: IoSocket) => {
   const ip = socket.data.ip ?? '';
+  if (notice && notice.until > Date.now()) socket.emit('notice', { text: notice.text });
 
   const enter = (room: Room, playerId: string) => {
     // Gleicher Raum, gleicher Spieler (z. B. doppeltes Wiederverbinden) → nicht „verlassen“!
@@ -103,7 +140,10 @@ io.on('connection', (socket: IoSocket) => {
 
   socket.on('room:create', ({ name, color }, ack) => {
     if (typeof ack !== 'function') return;
-    if (!createLimit.take(ip)) return ack({ ok: false, error: 'Zu viele neue Räume – warte kurz' });
+    if (!createLimit.take(ip)) {
+      stats.limited();
+      return ack({ ok: false, error: 'Zu viele neue Räume – warte kurz' });
+    }
     try {
       const { room, session } = rooms.create(String(name ?? ''), Number(color), socket.id);
       ack({ ok: true, ...session });
@@ -115,7 +155,10 @@ io.on('connection', (socket: IoSocket) => {
 
   socket.on('room:join', ({ roomCode, name, color }, ack) => {
     if (typeof ack !== 'function') return;
-    if (!joinLimit.take(ip)) return ack({ ok: false, error: 'Zu viele Versuche – warte kurz' });
+    if (!joinLimit.take(ip)) {
+      stats.limited();
+      return ack({ ok: false, error: 'Zu viele Versuche – warte kurz' });
+    }
     try {
       const { room, session } = rooms.join(String(roomCode ?? ''), String(name ?? ''), Number(color), socket.id);
       ack({ ok: true, ...session });
@@ -193,7 +236,73 @@ setInterval(() => {
   for (const room of rooms.cleanup(ROOM_IDLE_MS)) broadcast(room);
   createLimit.prune();
   joinLimit.prune();
+  const { online, games } = liveCounts();
+  stats.observe(online, games);
 }, 10_000).unref();
+setInterval(() => stats.save(), 30_000).unref();
+
+// ---------- Admin-Seite ----------
+
+/** Nachricht an alle – neue Verbindungen bekommen sie, solange sie gilt */
+const NOTICE_MS = 15 * 60 * 1000;
+let notice: { text: string; at: number; until: number } | null = null;
+
+function liveCounts() {
+  let games = 0;
+  for (const r of rooms.all()) if (r.game && !r.game.finished) games++;
+  return { online: io.engine.clientsCount, games };
+}
+
+const system = new SystemMonitor(liveCounts);
+
+const admin = createAdmin({
+  password: process.env.ADMIN_PASSWORD,
+  secureCookie: TRUST_PROXY,
+  ipOf: httpIp,
+  api: {
+    notice(text) {
+      notice = text ? { text, at: Date.now(), until: Date.now() + NOTICE_MS } : null;
+      io.emit('notice', text ? { text } : null);
+    },
+    state() {
+      const now = Date.now();
+      const list = [...rooms.all()].map((r) => ({
+        code: r.code,
+        phase: !r.game ? 'lobby' : r.game.finished ? 'finished' : 'playing',
+        paused: rooms.isPaused(r),
+        round: r.round,
+        createdAt: r.createdAt,
+        gameStartedAt: r.game && !r.game.finished ? r.gameStartedAt : null,
+        deckCount: r.game?.deck.length ?? null,
+        players: r.players.map((p) => ({
+          name: p.name,
+          color: AVATAR_COLORS[p.color] ?? AVATAR_COLORS[0],
+          connected: !!p.socketId,
+          host: p.id === r.hostId,
+          cards: r.game?.players.find((g) => g.id === p.id)?.hand.length ?? null,
+          durakCount: p.durakCount,
+        })),
+      }));
+      return {
+        now,
+        startedAt: STARTED_AT,
+        live: {
+          ...liveCounts(),
+          players: list.reduce((n, r) => n + r.players.filter((p) => p.connected).length, 0),
+          lobbies: list.filter((r) => r.phase === 'lobby').length,
+          rooms: list,
+        },
+        system: system.snapshot(),
+        history: system.samples,
+        days: stats.lastDays(30),
+        totals: stats.totals(),
+        games: stats.recentGames(30),
+        errors: stats.recentErrors(20),
+        notice: notice && notice.until > now ? notice : null,
+      };
+    },
+  },
+});
 
 http.listen(PORT, () => {
   console.log(`Durak-Backend läuft auf Port ${PORT} (CORS: ${CORS_ORIGIN.join(', ')})`);
@@ -201,6 +310,7 @@ http.listen(PORT, () => {
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
+    stats.save();
     io.close();
     process.exit(0);
   });

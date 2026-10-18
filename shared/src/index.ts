@@ -132,4 +132,6 @@ export interface ClientToServerEvents {
 
 export interface ServerToClientEvents {
   state: (view: GameView) => void;
+  /** Nachricht vom Betreiber an alle (null = weg) */
+  notice: (notice: { text: string } | null) => void;
 }
