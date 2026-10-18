@@ -3,18 +3,25 @@
 // Browser erlauben Ton erst nach einer Nutzeraktion → unlockAudio() beim ersten Klick aufrufen.
 
 export interface AudioPrefs {
-  music: boolean;
-  sfx: boolean;
+  /** 0 = aus, 1 = voll */
+  music: number;
+  sfx: number;
 }
 
 const PREFS_KEY = 'durak.audio';
 const MUSIC_VOLUME = 0.3;
+const DEFAULTS: AudioPrefs = { music: 0.7, sfx: 0.8 };
+
+/** Früher gab es nur An/Aus (true/false) – das in Lautstärken umrechnen */
+const level = (v: unknown, fallback: number) =>
+  typeof v === 'number' ? Math.min(1, Math.max(0, v)) : v === false ? 0 : fallback;
 
 function loadPrefs(): AudioPrefs {
   try {
-    return { music: true, sfx: true, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    return { music: level(raw.music, DEFAULTS.music), sfx: level(raw.sfx, DEFAULTS.sfx) };
   } catch {
-    return { music: true, sfx: true };
+    return { ...DEFAULTS };
   }
 }
 
@@ -83,9 +90,10 @@ export function unlockAudio(): void {
 
 function applyPrefs(): void {
   if (!ctx) return;
-  musicBus.gain.setTargetAtTime(prefs.music ? MUSIC_VOLUME : 0, ctx.currentTime, 0.5);
-  sfxBus.gain.value = prefs.sfx ? 1 : 0;
-  if (prefs.music) startMusic();
+  // Ohr hört logarithmisch – Quadrat fühlt sich am Regler gleichmäßiger an
+  musicBus.gain.setTargetAtTime(MUSIC_VOLUME * prefs.music ** 2, ctx.currentTime, 0.15);
+  sfxBus.gain.setTargetAtTime(prefs.sfx ** 2, ctx.currentTime, 0.05);
+  if (prefs.music > 0) startMusic();
   else stopMusic();
 }
 
@@ -242,7 +250,7 @@ function playEighth(s: number, t: number): void {
 // ---------- Soundeffekte ----------
 
 function play(fn: (t: number) => void): void {
-  if (!ctx || !prefs.sfx || ctx.state !== 'running') return;
+  if (!ctx || prefs.sfx === 0 || ctx.state !== 'running') return;
   fn(ctx.currentTime + 0.01);
 }
 
@@ -254,6 +262,12 @@ function snap(t: number, vol = 0.5): void {
 
 export const sfx = {
   tick: () => play((t) => burst(sfxBus, t, 0.03, 0.25, 'bandpass', 3200)),
+  /** Letzte Sekunde beim Nachlegen: lauteres, längeres „Klack“ */
+  tickLast: () =>
+    play((t) => {
+      burst(sfxBus, t, 0.06, 0.45, 'bandpass', 2200);
+      sine(sfxBus, 880, t, 0.25, 0.12, 440);
+    }),
   card: () => play((t) => snap(t)),
   /** Riffeln beim Mischen */
   shuffle: () =>
@@ -282,6 +296,12 @@ export const sfx = {
   bito: () => play((t) => burst(sfxBus, t, 0.4, 0.35, 'bandpass', 600, 5000)),
   win: () =>
     play((t) => [57, 64, 67, 71, 76].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.09, 1.6, 0.12))),
+  /** Karte vom Stapel ziehen: kurzes Wischen */
+  draw: () =>
+    play((t) => {
+      burst(sfxBus, t, 0.11, 0.16, 'bandpass', 1800, 4200);
+      burst(sfxBus, t + 0.09, 0.04, 0.12, 'highpass', 2500);
+    }),
   /** Chat-Nachricht: kurzes „Plopp“ */
   chat: () => play((t) => sine(sfxBus, 660, t, 0.09, 0.12, 990)),
   /** Etwas fliegt los */

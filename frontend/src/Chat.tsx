@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { CHAT_MAX, QUICK_PHRASES } from '@durak/shared';
+import { CHAT_MAX, QUICK_BY_LANG } from '@durak/shared';
 import { colorOf } from './Avatar';
 import { call, socket } from './socket';
 import { getChat, setChatOpen, subscribeChat } from './social';
 import { unlockAudio } from './audio';
+import { getLang, t } from './i18n';
 
 /** 💬-Knopf in der Kopfleiste und das Chatfenster darunter. */
 export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
@@ -62,7 +63,7 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
         ref={buttonRef}
         type="button"
         className={`icon-btn chat-toggle${chat.open ? ' active' : ''}`}
-        aria-label={chat.unread ? `Chat – ${chat.unread} neu` : 'Chat'}
+        aria-label={chat.unread ? t('chatUnread', { n: chat.unread }) : t('chat')}
         aria-expanded={chat.open}
         onClick={() => setChatOpen(!chat.open)}
       >
@@ -71,36 +72,36 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
       </button>
 
       {chat.open && (
-        <div ref={panelRef} className="chat-panel" role="dialog" aria-label="Chat">
+        <div ref={panelRef} className="chat-panel" role="dialog" aria-label={t('chat')}>
           <ol ref={logRef} className="chat-log" aria-live="polite">
-            {chat.messages.length === 0 && <li className="chat-empty">Noch nichts geschrieben. Tipp auf eine Figur, um etwas zu werfen 🍅</li>}
+            {chat.messages.length === 0 && <li className="chat-empty">{t('chatEmpty')}</li>}
             {chat.messages.map((m) => (
               <li key={m.id} className={m.from === me ? 'mine' : undefined}>
-                <b style={{ color: colorOf(m.color) }}>{m.from === me ? 'Du' : m.name}</b> {m.text}
+                <b style={{ color: colorOf(m.color) }}>{m.from === me ? t('youCap') : m.name}</b> {m.text}
               </li>
             ))}
           </ol>
           <div className="chat-quick">
-            {QUICK_PHRASES.map((q) => (
+            {QUICK_BY_LANG[getLang()].map((q) => (
               <button key={q} type="button" onClick={() => send(q)}>
                 {q}
               </button>
             ))}
           </div>
           {quickOnly ? (
-            <p className="chat-note">Öffentlicher Raum: nur Schnellsprüche.</p>
+            <p className="chat-note">{t('quickOnly')}</p>
           ) : (
           <form className="chat-form" onSubmit={submit}>
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               maxLength={CHAT_MAX}
-              placeholder="Nachricht …"
-              aria-label="Nachricht"
+              placeholder={t('messagePlaceholder')}
+              aria-label={t('message')}
               enterKeyHint="send"
               autoComplete="off"
             />
-            <button type="submit" className="chat-send" disabled={!text.trim()} aria-label="Senden">
+            <button type="submit" className="chat-send" disabled={!text.trim()} aria-label={t('send')}>
               <SendIcon />
             </button>
           </form>

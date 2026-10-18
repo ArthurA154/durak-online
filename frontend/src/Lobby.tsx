@@ -3,6 +3,7 @@ import { MAX_PLAYERS, MIN_PLAYERS, type GameView } from '@durak/shared';
 import { call, socket } from './socket';
 import { Seat, type SeatPos } from './Seat';
 import { Segmented } from './Segmented';
+import { t } from './i18n';
 
 const CHAIRS: SeatPos[] = ['bottom', 'left', 'top', 'right'];
 
@@ -34,17 +35,17 @@ export function Lobby({ view }: { view: GameView }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      setError('Kopieren ging nicht – schick einfach den Code.');
+      setError(t('copyFailed'));
     }
   };
 
   return (
     <main className="lobby">
       <div className="lobby-head">
-        <p className="lobby-label">Raum-Code</p>
+        <p className="lobby-label">{t('roomCode')}</p>
         <p className="room-code">{view.roomCode}</p>
         <button type="button" className="btn ghost small" onClick={copy}>
-          {copied ? 'Link kopiert' : 'Einladungslink kopieren'}
+          {copied ? t('linkCopied') : t('copyInvite')}
         </button>
       </div>
 
@@ -66,11 +67,11 @@ export function Lobby({ view }: { view: GameView }) {
               expression="happy"
               hat={p.id === view.lastDurakId}
               offline={!p.connected}
-              note={[p.id === view.you && 'du', p.id === view.hostId && 'Gastgeber'].filter(Boolean).join(', ') || undefined}
+              note={[p.id === view.you && t('you'), p.id === view.hostId && t('host')].filter(Boolean).join(', ') || undefined}
               action={
                 isHost && p.id !== view.you ? (
-                  <button type="button" className="kick-btn" onClick={() => kick(p.id)} aria-label={`${p.name} rauswerfen`}>
-                    rauswerfen
+                  <button type="button" className="kick-btn" onClick={() => kick(p.id)} aria-label={t('kickName', { name: p.name })}>
+                    {t('kick')}
                   </button>
                 ) : undefined
               }
@@ -84,37 +85,47 @@ export function Lobby({ view }: { view: GameView }) {
       {isHost ? (
         <div className="room-settings">
           <Segmented
-            label="Raum"
+            label={t('room')}
             value={view.settings.public}
             options={[
-              { value: false, label: 'Privat' },
-              { value: true, label: 'Öffentlich' },
+              { value: false, label: t('private') },
+              { value: true, label: t('public') },
             ]}
             onChange={(v) => change({ public: v })}
           />
           <Segmented
-            label="Nachlegen"
+            label={t('throwIn')}
             value={view.settings.neighborsOnly}
             options={[
-              { value: false, label: 'Alle' },
-              { value: true, label: 'Nur Nachbarn' },
+              { value: false, label: t('all') },
+              { value: true, label: t('neighborsOnly') },
             ]}
             onChange={(v) => change({ neighborsOnly: v })}
+          />
+          <Segmented
+            label={t('attackLimit')}
+            value={view.settings.unlimited}
+            options={[
+              { value: false, label: t('max6') },
+              { value: true, label: t('unlimited') },
+            ]}
+            onChange={(v) => change({ unlimited: v })}
           />
         </div>
       ) : (
         <p className="lobby-note">
-          {view.settings.public ? 'Öffentlicher Raum' : 'Privater Raum'} · Nachlegen:{' '}
-          {view.settings.neighborsOnly ? 'nur Nachbarn' : 'alle'}
+          {view.settings.public ? t('publicRoom') : t('privateRoom')} · {t('throwIn')}:{' '}
+          {view.settings.neighborsOnly ? t('throwInNeighbors') : t('throwInAll')} ·{' '}
+          {view.settings.unlimited ? t('attackUnlimited') : t('attackMax6')}
         </p>
       )}
 
       {isHost ? (
         <button type="button" className="btn" onClick={start} disabled={!enough}>
-          {enough ? 'Spiel starten' : 'Warte auf Mitspieler …'}
+          {enough ? t('startGame') : t('waitingForPlayers')}
         </button>
       ) : (
-        <p className="lobby-note">Der Gastgeber startet das Spiel.</p>
+        <p className="lobby-note">{t('hostStarts')}</p>
       )}
       {error && <p className="form-error">{error}</p>}
     </main>

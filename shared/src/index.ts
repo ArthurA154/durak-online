@@ -1,5 +1,8 @@
 // Gemeinsame Typen und Hilfsfunktionen für Frontend und Backend.
 
+import { QUICK_BY_LANG } from './i18n';
+export * from './i18n';
+
 export const SUITS = ['S', 'H', 'D', 'C'] as const; // Pik, Herz, Karo, Kreuz
 export type Suit = (typeof SUITS)[number];
 
@@ -20,6 +23,8 @@ export const MAX_PLAYERS = 4;
 export const TURN_SILENT_MS = 15_000;
 export const TURN_WARN_MS = 10_000;
 export const TURN_MS = TURN_SILENT_MS + TURN_WARN_MS;
+/** Nach „Schlucken“ oder „Alles geschlagen“: so lange dürfen die anderen noch nachlegen */
+export const THROW_IN_MS = 4_000;
 
 /** Wer so lange getrennt ist, darf von den anderen aus dem Raum entfernt werden (bzw. fliegt aus der Lobby). */
 export const AWAY_KICK_MS = 60_000;
@@ -65,6 +70,8 @@ export interface RoomSettings {
   public: boolean;
   /** Nachlegen nur für die beiden Nachbarn des Verteidigers */
   neighborsOnly: boolean;
+  /** Angriff ohne 6er-Grenze – so viele Karten, wie der Verteidiger hat */
+  unlimited: boolean;
 }
 
 /** Eintrag in der Liste offener Spiele auf der Startseite */
@@ -75,6 +82,7 @@ export interface OpenLobby {
   color: number;
   players: number;
   neighborsOnly: boolean;
+  unlimited: boolean;
 }
 
 export interface PlayerView {
@@ -114,7 +122,14 @@ export interface GameView {
   /** Verlierer; bei phase=finished und null → Unentschieden. */
   durakId: string | null;
   /** Zug-Timer: auf wen gewartet wird und wie viel Zeit noch bleibt (ab Versand). */
-  timer: { waitingOn: string[]; remainingMs: number } | null;
+  timer: {
+    waitingOn: string[];
+    remainingMs: number;
+    /** Gesamtdauer dieses Timers (für den Ring) */
+    totalMs: number;
+    /** 'throwIn' = kurzer Countdown zum Nachlegen */
+    kind: 'turn' | 'throwIn';
+  } | null;
   /** Durak der letzten Partie – trägt die Narrenkappe, mischt und fängt an */
   lastDurakId: string | null;
   /** Wer für die aktuelle Partie gemischt hat (null = erste Partie) */
@@ -140,8 +155,8 @@ export interface Session {
 
 export const CHAT_MAX = 120;
 
-/** Schnellsprüche – in öffentlichen Räumen die einzigen erlaubten Nachrichten */
-export const QUICK_PHRASES = ['😂', '👍', 'GG', 'Schluck!', 'Glück gehabt 🍀', 'Warte nur …', 'Ну ты дурак 😂'];
+/** Alle Schnellsprüche (jede Sprache) – in öffentlichen Räumen die einzigen erlaubten Nachrichten */
+export const QUICK_PHRASES = [...new Set(Object.values(QUICK_BY_LANG).flat())];
 /** So viele Nachrichten merkt sich ein Raum */
 export const CHAT_KEEP = 50;
 

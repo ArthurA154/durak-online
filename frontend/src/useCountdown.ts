@@ -7,9 +7,11 @@ export interface Countdown {
   /** 1 → 0 über die sichtbaren 10 Sekunden */
   fraction: number;
   waitingOn: string[];
+  /** 'throwIn' = kurzer Nachlege-Countdown (für alle hörbar) */
+  kind: 'turn' | 'throwIn';
 }
 
-/** Sichtbarer Countdown – erst in den letzten 10 Sekunden, vorher null. */
+/** Sichtbarer Countdown – erst in den letzten 10 Sekunden (beim Nachlegen ganz), vorher null. */
 export function useCountdown(view: GameView): Countdown | null {
   // Restzeit kommt relativ vom Server → unabhängig von falsch gehenden Uhren
   const deadline = useMemo(() => (view.timer ? Date.now() + view.timer.remainingMs : null), [view]);
@@ -24,10 +26,13 @@ export function useCountdown(view: GameView): Countdown | null {
 
   if (!deadline || !view.timer) return null;
   const left = deadline - now;
-  if (left > TURN_WARN_MS) return null;
+  // Sichtbar höchstens die letzten 10 s – kurze Timer (Nachlegen) von Anfang an
+  const visible = Math.min(TURN_WARN_MS, view.timer.totalMs);
+  if (left > visible) return null;
   return {
     seconds: Math.max(0, Math.ceil(left / 1000)),
-    fraction: Math.max(0, Math.min(1, left / TURN_WARN_MS)),
+    fraction: Math.max(0, Math.min(1, left / visible)),
     waitingOn: view.timer.waitingOn,
+    kind: view.timer.kind,
   };
 }

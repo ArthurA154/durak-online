@@ -423,3 +423,42 @@ describe('Nachlegen nur für Nachbarn', () => {
     expect(g.table).toHaveLength(2);
   });
 });
+
+describe('Angriff ohne 6er-Grenze', () => {
+  it('unbegrenzt: mehr als 6, aber nicht mehr als der Verteidiger Karten hat', () => {
+    const g = new DurakGame(['a', 'b'], shuffle(createDeck()), { unlimited: true });
+    g.attackerIdx = 0;
+    g.defenderIdx = 1;
+    g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(7, 'D'), c(7, 'C')];
+    g.players[1].hand = [c(14, 'S'), c(14, 'H'), c(14, 'D')];
+    g.attack('a', c(7, 'S'));
+    g.attack('a', c(7, 'H'));
+    g.attack('a', c(7, 'D'));
+    expect(() => g.attack('a', c(7, 'C'))).toThrow('Es darf keine Karte mehr gelegt werden');
+  });
+
+  it('unbegrenzt: 7 Karten auf einmal sind möglich', () => {
+    const g = new DurakGame(['a', 'b'], shuffle(createDeck()), { unlimited: true });
+    g.attackerIdx = 0;
+    g.defenderIdx = 1;
+    // a hat Siebener und Neuner, b hat 10 Karten
+    g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')];
+    g.players[1].hand = [c(9, 'S'), c(10, 'S'), c(10, 'H'), c(10, 'D'), c(10, 'C'), c(11, 'S'), c(11, 'H'), c(11, 'D'), c(11, 'C'), c(12, 'S')];
+    g.attack('a', c(7, 'S'));
+    g.defend('b', 0, c(9, 'S')); // jetzt liegen 7 und 9 → beide Werte erlaubt
+    for (const card of [c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')]) g.attack('a', card);
+    expect(g.table).toHaveLength(7);
+  });
+
+  it('Standard: bei 6 ist Schluss', () => {
+    const g = new DurakGame(['a', 'b'], shuffle(createDeck()), {});
+    g.attackerIdx = 0;
+    g.defenderIdx = 1;
+    g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')];
+    g.players[1].hand = [c(9, 'S'), c(10, 'S'), c(10, 'H'), c(10, 'D'), c(10, 'C'), c(11, 'S'), c(11, 'H'), c(11, 'D'), c(11, 'C'), c(12, 'S')];
+    g.attack('a', c(7, 'S'));
+    g.defend('b', 0, c(9, 'S'));
+    for (const card of [c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D')]) g.attack('a', card);
+    expect(() => g.attack('a', c(9, 'C'))).toThrow('Es darf keine Karte mehr gelegt werden');
+  });
+});

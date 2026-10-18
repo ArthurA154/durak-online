@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AWAY_KICK_MS, TURN_MS, TURN_WARN_MS } from '@durak/shared';
+import { AWAY_KICK_MS, THROW_IN_MS, TURN_MS, TURN_WARN_MS, type Card } from '@durak/shared';
 import { RoomManager, cleanChat, viewFor } from './rooms.js';
 import { CHAT_KEEP, CHAT_MAX } from '@durak/shared';
 
@@ -43,6 +43,52 @@ describe('Zug-Timer im Raum', () => {
     rooms.armTimer(room, fired);
     vi.advanceTimersByTime(TURN_MS - 1000);
     expect(fired).not.toHaveBeenCalled();
+  });
+
+  /** Anna greift mit 7♠ an, Ben hat 9♠ (schlägt) und 7♥ (zum Nachlegen bei Anna) */
+  function bout() {
+    const { rooms, room } = startedRoom();
+    const g = room.game!;
+    const c = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
+    g.attackerIdx = 0;
+    g.defenderIdx = 1;
+    g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(14, 'D')];
+    g.players[1].hand = [c(9, 'S'), c(6, 'D'), c(12, 'C')];
+    g.attack(g.players[0].id, c(7, 'S'));
+    rooms.armTimer(room, () => {});
+    return { rooms, room, g, c, anna: g.players[0].id, ben: g.players[1].id };
+  }
+
+  it('nach dem Schlucken: 4-Sekunden-Countdown, dann nimmt der Verteidiger', () => {
+    const { rooms, room, g, ben } = bout();
+    g.take(ben);
+    rooms.armTimer(room, () => {});
+    expect(viewFor(room, ben).timer).toMatchObject({ kind: 'throwIn', totalMs: THROW_IN_MS });
+    vi.advanceTimersByTime(THROW_IN_MS);
+    expect(g.table).toEqual([]);
+    expect(g.players[1].hand.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('Nachlegen setzt den Countdown nicht zurück', () => {
+    const { rooms, room, g, c, anna, ben } = bout();
+    g.take(ben);
+    rooms.armTimer(room, () => {});
+    vi.advanceTimersByTime(THROW_IN_MS - 1000);
+    g.attack(anna, c(7, 'H'));
+    rooms.armTimer(room, () => {});
+    expect(viewFor(room, ben).timer?.remainingMs).toBe(1000);
+    vi.advanceTimersByTime(1000);
+    expect(g.table).toEqual([]);
+  });
+
+  it('alles geschlagen: auch nur 4 Sekunden, dann Bito', () => {
+    const { rooms, room, g, c, ben } = bout();
+    g.defend(ben, 0, c(9, 'S'));
+    rooms.armTimer(room, () => {});
+    expect(viewFor(room, ben).timer?.kind).toBe('throwIn');
+    vi.advanceTimersByTime(THROW_IN_MS);
+    expect(g.table).toEqual([]);
+    expect(g.discardCount).toBe(2);
   });
 
   it('Raum verlassen in der Lobby / Aufräumen stoppt den Timer', () => {
@@ -195,7 +241,7 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const rooms = new RoomManager();
     const pub = rooms.create('Anna', 0, 's1', true).room;
     rooms.create('Privat', 1, 's2');
-    expect(rooms.openLobbies()).toEqual([{ code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false }]);
+    expect(rooms.openLobbies()).toEqual([{ code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false }]);
     const b = rooms.join(pub.code, 'Ben', 1, 's3').session;
     rooms.start(pub, pub.hostId);
     expect(rooms.openLobbies()).toEqual([]); // läuft → nicht mehr sichtbar
@@ -207,10 +253,11 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const { room, session } = rooms.create('Anna', 0, 's1');
     const b = rooms.join(room.code, 'Ben', 1, 's2').session;
     expect(() => rooms.updateSettings(room, b.playerId, { public: true })).toThrow('Nur der Gastgeber');
-    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true });
-    expect(room.settings).toEqual({ public: true, neighborsOnly: true });
+    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true, unlimited: true });
+    expect(room.settings).toEqual({ public: true, neighborsOnly: true, unlimited: true });
     rooms.start(room, session.playerId);
     expect(room.game!.neighborsOnly).toBe(true);
+    expect(room.game!.maxTable).toBe(Infinity);
     expect(() => rooms.updateSettings(room, session.playerId, { public: false })).toThrow('Erst nach der Partie');
   });
 

@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { CardBack } from './CardView';
 import { Avatar, type Expression } from './Avatar';
+import { t } from './i18n';
 
 /** Plätze am Tisch, von oben gesehen. „bottom“ ist immer man selbst. */
 export type SeatPos = 'bottom' | 'left' | 'top' | 'right' | 'top-left' | 'top-right';
@@ -67,19 +68,19 @@ export function Seat(props: Props) {
         {countdown && (
           <>
             <span className="timer-ring" style={{ '--p': countdown.fraction } as CSSProperties} />
-            <span className="timer-num" aria-label={`noch ${countdown.seconds} Sekunden`}>
+            <span className="timer-num" aria-label={t('secondsLeft', { n: countdown.seconds })}>
               {countdown.seconds}
             </span>
           </>
         )}
         {done && (
-          <span className="avatar-badge done" title="ist fertig">
+          <span className="avatar-badge done" title={t('isDone')}>
             ✓
           </span>
         )}
         {cardCount !== undefined && !out && <span className="avatar-badge count">{cardCount}</span>}
       </div>
-      <div className="seat-name">{empty ? 'frei' : name}</div>
+      <div className="seat-name">{empty ? t('free') : name}</div>
       {note && <div className="seat-note">{note}</div>}
       {props.action}
     </div>

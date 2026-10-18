@@ -41,8 +41,258 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+/* ---------- Hintergrund-Szene (Theme.tsx) ---------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
   background: radial-gradient(ellipse 80% 70% at 50% 45%, var(--room-light), var(--room) 75%);
-  background-attachment: fixed;
+}
+
+.backdrop .scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ränder abdunkeln, damit Schrift und Karten vorne bleiben */
+.backdrop-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 75% 70% at 50% 45%, transparent 40%, rgba(0, 0, 0, 0.55));
+}
+
+.backdrop[data-scene='classic'] .backdrop-vignette {
+  display: none;
+}
+
+.scene .twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.scene .train-far {
+  animation: drive 60s linear infinite;
+}
+
+.scene .train-near {
+  animation: drive 22s linear infinite;
+}
+
+@keyframes drive {
+  to {
+    transform: translateX(-1600px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene .twinkle,
+  .scene .train-far,
+  .scene .train-near {
+    animation: none;
+  }
+}
+
+/* ---------- Tischoberflächen je Thema ---------- */
+
+[data-theme='wood'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 220, 160, 0.18), transparent 70%),
+    repeating-linear-gradient(
+      93deg,
+      rgba(0, 0, 0, 0) 0 22px,
+      rgba(60, 30, 10, 0.18) 22px 24px,
+      rgba(0, 0, 0, 0) 24px 51px,
+      rgba(255, 220, 170, 0.07) 51px 53px
+    ),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 160px),
+    radial-gradient(ellipse at center, var(--felt) 30%, var(--felt-edge) 100%);
+}
+
+[data-theme='pub'] .felt {
+  background:
+    radial-gradient(circle at 16% 26%, #d9c79c 0 26px, #b33a2a 26px 31px, transparent 32px),
+    radial-gradient(circle at 86% 72%, #e8dfc8 0 24px, #2a5a8a 24px 29px, transparent 30px),
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 190, 110, 0.14), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 3px, transparent 3px 120px),
+    repeating-linear-gradient(91deg, transparent 0 30px, rgba(255, 210, 160, 0.05) 30px 32px),
+    radial-gradient(ellipse at center, var(--felt) 30%, var(--felt-edge) 100%);
+}
+
+[data-theme='space'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(77, 225, 255, 0.12), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(77, 225, 255, 0.05) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(77, 225, 255, 0.05) 0 1px, transparent 1px 40px),
+    radial-gradient(ellipse at center, var(--felt) 30%, var(--felt-edge) 100%);
+  box-shadow:
+    inset 0 0 40px rgba(77, 225, 255, 0.15),
+    0 0 0 10px var(--rim),
+    0 0 0 12px var(--rim-light),
+    0 0 30px 12px rgba(77, 225, 255, 0.35),
+    0 24px 60px 10px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='train'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.25), transparent 70%),
+    radial-gradient(circle at 85% 30%, #b98a3a 0 20px, #d9dde2 20px 27px, transparent 28px),
+    radial-gradient(circle at 85% 30%, rgba(0, 0, 0, 0.18) 0 34px, transparent 35px),
+    radial-gradient(ellipse at center, var(--felt) 40%, var(--felt-edge) 100%);
+}
+
+[data-theme='kitchen'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(196, 60, 52, 0.22) 0 26px, transparent 26px 52px),
+    repeating-linear-gradient(90deg, rgba(196, 60, 52, 0.22) 0 26px, transparent 26px 52px),
+    radial-gradient(ellipse at center, var(--felt) 40%, var(--felt-edge) 100%);
+}
+
+[data-theme='beach'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.1), transparent 70%),
+    radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.25) 100%),
+    repeating-linear-gradient(
+      90deg,
+      var(--felt) 0 110px,
+      #c9c3b0 110px 122px,
+      #c86a57 122px 134px,
+      #c9c3b0 134px 146px
+    );
+}
+
+[data-theme='casino'] .felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 140, 140, 0.18), transparent 70%),
+    radial-gradient(ellipse at center, var(--felt) 30%, var(--felt-edge) 100%);
+  box-shadow:
+    inset 0 0 0 3px rgba(0, 0, 0, 0.25),
+    inset 0 10px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 10px var(--rim),
+    0 0 0 13px var(--rim-light),
+    0 0 0 16px var(--rim),
+    0 24px 60px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Helle oder bunte Tische: Namen und Status der Spieler auf dunklem Grund, damit lesbar */
+[data-theme='train'] .seat-name,
+[data-theme='train'] .seat-note,
+[data-theme='kitchen'] .seat-name,
+[data-theme='kitchen'] .seat-note,
+[data-theme='beach'] .seat-name,
+[data-theme='beach'] .seat-note {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(10, 10, 16, 0.72);
+}
+
+/* Helle Tische: Text auf dem Tisch dunkel */
+[data-theme='train'] .mini-felt-text,
+[data-theme='kitchen'] .mini-felt-text {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.draw-flyer {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- Thema wählen ---------- */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.theme-tile {
+  display: grid;
+  gap: 6px;
+  padding: 6px 6px 8px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.theme-tile.on {
+  box-shadow: inset 0 0 0 2px var(--yellow);
+}
+
+.theme-preview {
+  position: relative;
+  height: 58px;
+  border-radius: 10px;
+  background: var(--p-room);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.theme-preview i {
+  width: 70%;
+  height: 56%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, var(--p-felt) 35%, var(--p-edge));
+  box-shadow: 0 0 0 4px var(--p-rim);
+}
+
+.theme-preview[data-preview='space'] {
+  background:
+    radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 20%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 70%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 35% 80%, #fff 0 1px, transparent 2px),
+    radial-gradient(ellipse at 25% 30%, rgba(123, 63, 228, 0.5), transparent 60%),
+    var(--p-room);
+}
+
+.theme-preview[data-preview='beach'] {
+  background: linear-gradient(#6a2f5c, #d26a4f 55%, #24375e 56%);
+}
+
+.theme-preview[data-preview='beach'] i {
+  background: repeating-linear-gradient(90deg, var(--p-felt) 0 10px, #e8e2d0 10px 14px, #e2735c 14px 18px);
+}
+
+.theme-preview[data-preview='kitchen'] i {
+  background:
+    repeating-linear-gradient(0deg, rgba(196, 60, 52, 0.3) 0 5px, transparent 5px 10px),
+    repeating-linear-gradient(90deg, rgba(196, 60, 52, 0.3) 0 5px, transparent 5px 10px),
+    var(--p-felt);
+}
+
+.theme-preview[data-preview='wood'] i,
+.theme-preview[data-preview='pub'] i {
+  background:
+    repeating-linear-gradient(93deg, transparent 0 5px, rgba(0, 0, 0, 0.2) 5px 6px),
+    radial-gradient(ellipse at center, var(--p-felt) 35%, var(--p-edge));
+}
+
+.theme-preview[data-preview='train'] {
+  background: linear-gradient(#1d2b4f, #c86a4a 70%, #1f2b28 71%);
+}
+
+.theme-preview[data-preview='space'] i {
+  box-shadow: 0 0 0 3px var(--p-rim), 0 0 10px 3px rgba(77, 225, 255, 0.5);
 }
 
 .app {
@@ -170,9 +420,116 @@ body {
   font-size: 0.85rem;
 }
 
-.audio-toggles {
-  display: flex;
-  gap: 6px;
+/* ---------- Kleine Fenster aus der Kopfleiste (Lautstärke, Hintergrund) ---------- */
+
+.popover {
+  position: relative;
+}
+
+.icon-btn.active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.popover-panel {
+  /* fest am rechten Rand (wie der Chat), damit es am Handy nie aus dem Bild ragt */
+  position: fixed;
+  top: 60px;
+  right: 12px;
+  z-index: 120;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--room-light);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.settings-panel {
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-section h3 {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.settings-panel .segmented-row {
+  flex-wrap: wrap;
+}
+
+.volume-sliders {
+  display: grid;
+  gap: 12px;
+}
+
+.volume-row {
+  display: grid;
+  grid-template-columns: 22px 62px 1fr 30px;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.volume-icon {
+  display: grid;
+  place-items: center;
+}
+
+.volume-icon.off {
+  opacity: 0.4;
+}
+
+.volume-value {
+  text-align: right;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.volume-row input[type='range'] {
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.volume-row input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--yellow) var(--p), rgba(0, 0, 0, 0.35) var(--p));
+}
+
+.volume-row input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--yellow) var(--p), rgba(0, 0, 0, 0.35) var(--p));
+}
+
+.volume-row input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.volume-row input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* ---------- Knöpfe & Felder ---------- */
@@ -790,24 +1147,24 @@ input:focus {
 }
 
 .corner b {
-  font-weight: 800;
-  font-size: calc(var(--cw) * 0.21);
-  letter-spacing: -0.04em;
+  font-weight: 900;
+  font-size: calc(var(--cw) * 0.26);
+  letter-spacing: -0.05em;
 }
 
 .corner i {
   font-style: normal;
-  font-size: calc(var(--cw) * 0.16);
+  font-size: calc(var(--cw) * 0.2);
 }
 
 .corner.tl {
-  top: 6%;
-  left: 8%;
+  top: 5%;
+  left: 6%;
 }
 
 .corner.br {
-  bottom: 6%;
-  right: 8%;
+  bottom: 5%;
+  right: 6%;
   transform: rotate(180deg);
 }
 
@@ -990,6 +1347,21 @@ input:focus {
   grid-auto-flow: row;
   grid-template-columns: repeat(3, auto);
   padding-top: 52px;
+}
+
+/* Ohne 6er-Grenze: Platz für viele Paare */
+.play-area.many {
+  --cw: clamp(
+    30px,
+    min(
+      calc(var(--base-cw) * 0.8),
+      calc((min(100vw, 1100px) - 460px) / (var(--cols) * 1.45)),
+      calc((100dvh - 470px) / (var(--rows) * 1.75))
+    ),
+    70px
+  );
+  grid-template-columns: repeat(var(--cols), auto);
+  gap: 8px 16px;
 }
 
 .play-area.glow {
@@ -1281,8 +1653,14 @@ input:focus {
 
 @media (max-width: 700px) {
   :root {
-    --base-cw: 52px;
+    --base-cw: 56px;
     --mini-w: 24px;
+  }
+
+  /* Eigene Karten am Handy größer – die schaut man am genauesten an */
+  .hand {
+    --cw: 62px;
+    padding-top: 24px;
   }
 
   .topbar {
@@ -1357,6 +1735,15 @@ input:focus {
     gap: 8px 14px;
     padding: 60px 4px 70px;
     border-radius: 100px;
+  }
+
+  .play-area.many {
+    --cw: clamp(
+      30px,
+      min(calc(var(--base-cw) * 0.8), calc((100vw - 120px) / 4.4), calc((100dvh - 490px) / (var(--rows) * 1.75))),
+      56px
+    );
+    gap: 6px 10px;
   }
 
   .pair {

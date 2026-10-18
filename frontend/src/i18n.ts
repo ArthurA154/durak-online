@@ -1,0 +1,481 @@
+import { useSyncExternalStore } from 'react';
+import { LANGS, translateServer, type Lang } from '@durak/shared';
+
+// Übersetzungen der Oberfläche. Deutsch ist die Vorlage – Englisch und Russisch müssen
+// dieselben Schlüssel haben (prüft TypeScript). Platzhalter: {name}, {n} …
+
+const de = {
+  // Allgemein
+  leaveRoom: 'Raum verlassen',
+  leaveConfirm: 'Wirklich gehen? Du wirst aus dem laufenden Spiel entfernt.',
+  connecting: 'Verbinde mit dem Server …',
+  serverUnreachable: 'Server nicht erreichbar – neuer Versuch läuft …',
+  noAnswer: 'Keine Antwort vom Server – versuch es nochmal',
+  noConnection: 'Keine Verbindung zum Server',
+  kicked: 'Der Gastgeber hat dich aus dem Raum entfernt.',
+  close: 'Schliessen',
+
+  // Einstellungen
+  settings: 'Einstellungen',
+  language: 'Sprache',
+  volume: 'Lautstärke',
+  music: 'Musik',
+  effects: 'Effekte',
+  off: 'aus',
+  percent: '{n} Prozent',
+  background: 'Hintergrund',
+  'theme.classic': 'Klassik',
+  'theme.wood': 'Holztisch',
+  'theme.pub': 'Kneipe',
+  'theme.space': 'Weltraum',
+  'theme.train': 'Zugabteil',
+  'theme.kitchen': 'Babuschkas Küche',
+  'theme.beach': 'Strand',
+  'theme.casino': 'Casino',
+
+  // Startseite
+  yourName: 'Dein Name',
+  colorN: 'Farbe {n}',
+  avatarColor: 'Farbe deiner Figur',
+  newRoom: 'Neuer Raum',
+  private: 'Privat',
+  public: 'Öffentlich',
+  createRoom: 'Raum erstellen',
+  or: 'oder',
+  roomCode: 'Raum-Code',
+  join: 'Beitreten',
+  openGames: 'Offene Spiele',
+  noOpenGames: 'Gerade wartet niemand. Erstell einen öffentlichen Raum – dann taucht er hier auf.',
+  playersOf: '{n}/{max} Spieler',
+  neighborsOnlyShort: 'nur Nachbarn legen nach',
+  enterNameFirst: 'Gib zuerst deinen Namen ein.',
+  play: 'Mitspielen',
+
+  // Lobby
+  copyFailed: 'Kopieren ging nicht – schick einfach den Code.',
+  linkCopied: 'Link kopiert',
+  copyInvite: 'Einladungslink kopieren',
+  you: 'du',
+  youCap: 'Du',
+  host: 'Gastgeber',
+  kick: 'rauswerfen',
+  kickName: '{name} rauswerfen',
+  room: 'Raum',
+  throwIn: 'Nachlegen',
+  all: 'Alle',
+  neighborsOnly: 'Nur Nachbarn',
+  publicRoom: 'Öffentlicher Raum',
+  privateRoom: 'Privater Raum',
+  throwInAll: 'alle',
+  throwInNeighbors: 'nur Nachbarn',
+  attackLimit: 'Angriff',
+  max6: 'Max. 6',
+  unlimited: 'Unbegrenzt',
+  attackMax6: 'max. 6 Karten',
+  attackUnlimited: 'ohne 6er-Grenze',
+  startGame: 'Spiel starten',
+  waitingForPlayers: 'Warte auf Mitspieler …',
+  hostStarts: 'Der Gastgeber startet das Spiel.',
+  free: 'frei',
+
+  // Am Tisch
+  isOut: 'raus',
+  smokeBreak: 'Raucherpause 🚬',
+  attacks: 'greift an',
+  takes: 'schluckt',
+  defends: 'verteidigt',
+  youAreOut: 'Du bist raus! 🎉',
+  nameIsOut: '{name} ist raus! 🎉',
+  dragOntoTarget: 'Zieh die Karte direkt auf die Karte, die du schlagen willst',
+  deckLabel: 'Stapel: {n} Karten, Trumpf {suit}',
+  trump: 'Trumpf',
+  discardLabel: 'Ablage: {n} Karten',
+  shuffling: 'Es wird gemischt …',
+  youShuffle: 'Du warst der Durak – du mischst!',
+  nameShuffles: '{name} war der Durak und muss mischen',
+  secondsLowest: 'Sekunden – sonst wird deine kleinste Karte gespielt',
+  secondsTake: 'Sekunden – sonst schluckst du',
+  secondsDone: 'Sekunden – sonst bist du fertig',
+  pausedWait: 'Pause – warte, bis alle wieder da sind',
+  transfer: 'Weiterschieben',
+  take: 'Schlucken',
+  done: 'Fertig',
+  secondsLeft: 'noch {n} Sekunden',
+  isDone: 'ist fertig',
+  pause: 'Pause',
+  nameSmokeBreak: '{name} macht Raucherpause 🚬',
+  waitSeconds: 'Noch {n} s',
+  playWithout: 'Ohne {name} weiterspielen',
+
+  // Zug-Text
+  turnOut: 'Du bist raus – schau zu, wer Durak wird.',
+  turnYouAttack: 'Du greifst an: Zieh eine Karte auf den Tisch.',
+  turnNameAttacks: '{name} greift an …',
+  turnNameAttacksYouNext: '{name} greift an – du verteidigst gleich …',
+  turnYouTake: 'Du schluckst. Die anderen dürfen noch passende Karten nachlegen …',
+  turnTakesNeighbors: '{name} schluckt – nur die Nachbarn dürfen nachlegen.',
+  turnTakesWait: '{name} schluckt – warte auf die anderen …',
+  turnTakesThrowIn: '{name} schluckt. Leg passende Karten nach oder drück „Fertig“.',
+  turnYouDefend: 'Du verteidigst: Zieh eine Karte auf die Karte, die du schlagen willst.',
+  turnNameDefends: '{name} verteidigt …',
+  turnAllBeatenWait: 'Alles geschlagen – warte, ob nachgelegt wird …',
+  turnAllBeatenNeighbors: 'Alles geschlagen – nur die Nachbarn dürfen nachlegen.',
+  turnWaitOthers: 'Warte auf die anderen …',
+  turnAllBeatenThrowIn: 'Alles geschlagen. Leg passende Karten nach oder drück „Fertig“.',
+
+  // Ergebnis
+  draw: 'Unentschieden',
+  youAreThe: 'Du bist der',
+  nameIsThe: '{name} ist der',
+  durakCounter: 'Durak-Zähler',
+  oneMoreGame: 'Noch ein Spiel!',
+  hostCanRestart: 'Der Gastgeber kann eine neue Runde starten.',
+
+  // Chat & Werfen
+  chat: 'Chat',
+  chatUnread: 'Chat – {n} neu',
+  chatEmpty: 'Noch nichts geschrieben. Tipp auf eine Figur, um etwas zu werfen 🍅',
+  message: 'Nachricht',
+  messagePlaceholder: 'Nachricht …',
+  send: 'Senden',
+  quickOnly: 'Öffentlicher Raum: nur Schnellsprüche.',
+  throwAt: 'Auf {name} werfen',
+  throwAtLabel: 'Etwas auf {name} werfen',
+  thePlayer: 'den Spieler',
+  'item.tomato': 'Tomate',
+  'item.egg': 'Ei',
+  'item.slipper': 'Hausschuh',
+  'item.fish': 'Fisch',
+  'item.flowers': 'Blumen',
+};
+
+export type Key = keyof typeof de;
+
+const en: Record<Key, string> = {
+  leaveRoom: 'Leave room',
+  leaveConfirm: "Really leave? You'll be removed from the running game.",
+  connecting: 'Connecting to the server …',
+  serverUnreachable: "Can't reach the server – retrying …",
+  noAnswer: 'No answer from the server – try again',
+  noConnection: 'No connection to the server',
+  kicked: 'The host removed you from the room.',
+  close: 'Close',
+
+  settings: 'Settings',
+  language: 'Language',
+  volume: 'Volume',
+  music: 'Music',
+  effects: 'Effects',
+  off: 'off',
+  percent: '{n} percent',
+  background: 'Background',
+  'theme.classic': 'Classic',
+  'theme.wood': 'Wooden table',
+  'theme.pub': 'Pub',
+  'theme.space': 'Space',
+  'theme.train': 'Train compartment',
+  'theme.kitchen': "Babushka's kitchen",
+  'theme.beach': 'Beach',
+  'theme.casino': 'Casino',
+
+  yourName: 'Your name',
+  colorN: 'Colour {n}',
+  avatarColor: "Your figure's colour",
+  newRoom: 'New room',
+  private: 'Private',
+  public: 'Public',
+  createRoom: 'Create room',
+  or: 'or',
+  roomCode: 'Room code',
+  join: 'Join',
+  openGames: 'Open games',
+  noOpenGames: 'Nobody is waiting right now. Create a public room and it shows up here.',
+  playersOf: '{n}/{max} players',
+  neighborsOnlyShort: 'only neighbours throw in',
+  enterNameFirst: 'Enter your name first.',
+  play: 'Join',
+
+  copyFailed: "Copying didn't work – just send the code.",
+  linkCopied: 'Link copied',
+  copyInvite: 'Copy invite link',
+  you: 'you',
+  youCap: 'You',
+  host: 'host',
+  kick: 'kick',
+  kickName: 'Kick {name}',
+  room: 'Room',
+  throwIn: 'Throw in',
+  all: 'Everyone',
+  neighborsOnly: 'Neighbours only',
+  publicRoom: 'Public room',
+  privateRoom: 'Private room',
+  throwInAll: 'everyone',
+  throwInNeighbors: 'neighbours only',
+  attackLimit: 'Attack',
+  max6: 'Max. 6',
+  unlimited: 'Unlimited',
+  attackMax6: 'max. 6 cards',
+  attackUnlimited: 'no 6-card limit',
+  startGame: 'Start game',
+  waitingForPlayers: 'Waiting for players …',
+  hostStarts: 'The host starts the game.',
+  free: 'free',
+
+  isOut: 'out',
+  smokeBreak: 'Smoke break 🚬',
+  attacks: 'attacks',
+  takes: 'takes',
+  defends: 'defends',
+  youAreOut: "You're out! 🎉",
+  nameIsOut: '{name} is out! 🎉',
+  dragOntoTarget: 'Drag the card onto the card you want to beat',
+  deckLabel: 'Deck: {n} cards, trump {suit}',
+  trump: 'Trump',
+  discardLabel: 'Discard pile: {n} cards',
+  shuffling: 'Shuffling …',
+  youShuffle: 'You were the Durak – you shuffle!',
+  nameShuffles: '{name} was the Durak and has to shuffle',
+  secondsLowest: 'seconds – or your lowest card gets played',
+  secondsTake: 'seconds – or you take',
+  secondsDone: "seconds – or you're done",
+  pausedWait: 'Paused – wait until everyone is back',
+  transfer: 'Transfer',
+  take: 'Take',
+  done: 'Done',
+  secondsLeft: '{n} seconds left',
+  isDone: 'is done',
+  pause: 'Paused',
+  nameSmokeBreak: '{name} is on a smoke break 🚬',
+  waitSeconds: '{n} s left',
+  playWithout: 'Play on without {name}',
+
+  turnOut: "You're out – watch who becomes the Durak.",
+  turnYouAttack: 'Your attack: drag a card onto the table.',
+  turnNameAttacks: '{name} attacks …',
+  turnNameAttacksYouNext: '{name} attacks – you defend next …',
+  turnYouTake: "You're taking. The others may still throw in matching cards …",
+  turnTakesNeighbors: '{name} takes – only the neighbours may throw in.',
+  turnTakesWait: '{name} takes – waiting for the others …',
+  turnTakesThrowIn: '{name} takes. Throw in matching cards or press “Done”.',
+  turnYouDefend: "You defend: drag a card onto the card you want to beat.",
+  turnNameDefends: '{name} defends …',
+  turnAllBeatenWait: 'All beaten – waiting to see if more comes …',
+  turnAllBeatenNeighbors: 'All beaten – only the neighbours may throw in.',
+  turnWaitOthers: 'Waiting for the others …',
+  turnAllBeatenThrowIn: 'All beaten. Throw in matching cards or press “Done”.',
+
+  draw: 'Draw',
+  youAreThe: "You're the",
+  nameIsThe: '{name} is the',
+  durakCounter: 'Durak counter',
+  oneMoreGame: 'One more game!',
+  hostCanRestart: 'The host can start a new round.',
+
+  chat: 'Chat',
+  chatUnread: 'Chat – {n} new',
+  chatEmpty: 'Nothing here yet. Tap a figure to throw something 🍅',
+  message: 'Message',
+  messagePlaceholder: 'Message …',
+  send: 'Send',
+  quickOnly: 'Public room: quick phrases only.',
+  throwAt: 'Throw at {name}',
+  throwAtLabel: 'Throw something at {name}',
+  thePlayer: 'the player',
+  'item.tomato': 'Tomato',
+  'item.egg': 'Egg',
+  'item.slipper': 'Slipper',
+  'item.fish': 'Fish',
+  'item.flowers': 'Flowers',
+};
+
+const ru: Record<Key, string> = {
+  leaveRoom: 'Выйти',
+  leaveConfirm: 'Точно уйти? Тебя уберут из текущей игры.',
+  connecting: 'Подключаемся к серверу …',
+  serverUnreachable: 'Сервер недоступен – пробуем снова …',
+  noAnswer: 'Сервер не отвечает – попробуй ещё раз',
+  noConnection: 'Нет связи с сервером',
+  kicked: 'Хозяин удалил тебя из комнаты.',
+  close: 'Закрыть',
+
+  settings: 'Настройки',
+  language: 'Язык',
+  volume: 'Громкость',
+  music: 'Музыка',
+  effects: 'Эффекты',
+  off: 'выкл',
+  percent: '{n} процентов',
+  background: 'Фон',
+  'theme.classic': 'Классика',
+  'theme.wood': 'Деревянный стол',
+  'theme.pub': 'Пивная',
+  'theme.space': 'Космос',
+  'theme.train': 'Плацкарт',
+  'theme.kitchen': 'Бабушкина кухня',
+  'theme.beach': 'Пляж',
+  'theme.casino': 'Казино',
+
+  yourName: 'Твоё имя',
+  colorN: 'Цвет {n}',
+  avatarColor: 'Цвет твоей фигурки',
+  newRoom: 'Новая комната',
+  private: 'Закрытая',
+  public: 'Открытая',
+  createRoom: 'Создать комнату',
+  or: 'или',
+  roomCode: 'Код комнаты',
+  join: 'Войти',
+  openGames: 'Открытые игры',
+  noOpenGames: 'Сейчас никто не ждёт. Создай открытую комнату – она появится здесь.',
+  playersOf: '{n}/{max} игроков',
+  neighborsOnlyShort: 'подкидывают только соседи',
+  enterNameFirst: 'Сначала введи имя.',
+  play: 'Играть',
+
+  copyFailed: 'Не удалось скопировать – просто отправь код.',
+  linkCopied: 'Ссылка скопирована',
+  copyInvite: 'Скопировать приглашение',
+  you: 'ты',
+  youCap: 'Ты',
+  host: 'хозяин',
+  kick: 'выгнать',
+  kickName: 'Выгнать {name}',
+  room: 'Комната',
+  throwIn: 'Подкидывать',
+  all: 'Все',
+  neighborsOnly: 'Только соседи',
+  publicRoom: 'Открытая комната',
+  privateRoom: 'Закрытая комната',
+  throwInAll: 'все',
+  throwInNeighbors: 'только соседи',
+  attackLimit: 'Ход',
+  max6: 'До 6',
+  unlimited: 'Без лимита',
+  attackMax6: 'до 6 карт',
+  attackUnlimited: 'без лимита в 6 карт',
+  startGame: 'Начать игру',
+  waitingForPlayers: 'Ждём игроков …',
+  hostStarts: 'Игру начинает хозяин.',
+  free: 'свободно',
+
+  isOut: 'вне игры',
+  smokeBreak: 'Перекур 🚬',
+  attacks: 'ходит',
+  takes: 'берёт',
+  defends: 'отбивается',
+  youAreOut: 'Ты вне игры! 🎉',
+  nameIsOut: '{name} – вне игры! 🎉',
+  dragOntoTarget: 'Перетащи карту прямо на ту, которую хочешь побить',
+  deckLabel: 'Колода: {n} карт, козырь {suit}',
+  trump: 'Козырь',
+  discardLabel: 'Бито: {n} карт',
+  shuffling: 'Тасуем …',
+  youShuffle: 'Дурак прошлой партии – ты. Тебе тасовать!',
+  nameShuffles: '{name} – дурак прошлой партии и тасует',
+  secondsLowest: 'сек. – иначе пойдёт твоя младшая карта',
+  secondsTake: 'сек. – иначе берёшь',
+  secondsDone: 'сек. – иначе пас',
+  pausedWait: 'Пауза – ждём, пока все вернутся',
+  transfer: 'Перевести',
+  take: 'Беру',
+  done: 'Бито',
+  secondsLeft: 'осталось {n} секунд',
+  isDone: 'готов',
+  pause: 'Пауза',
+  nameSmokeBreak: '{name} на перекуре 🚬',
+  waitSeconds: 'Ещё {n} с',
+  playWithout: 'Играть без {name}',
+
+  turnOut: 'Ты вне игры – смотри, кто останется дураком.',
+  turnYouAttack: 'Твой ход: перетащи карту на стол.',
+  turnNameAttacks: '{name} ходит …',
+  turnNameAttacksYouNext: '{name} ходит – ты отбиваешься …',
+  turnYouTake: 'Ты берёшь. Остальные ещё могут подкинуть …',
+  turnTakesNeighbors: '{name} берёт – подкидывать могут только соседи.',
+  turnTakesWait: '{name} берёт – ждём остальных …',
+  turnTakesThrowIn: '{name} берёт. Подкинь подходящие карты или нажми «Бито».',
+  turnYouDefend: 'Отбивайся: перетащи карту на ту, которую хочешь побить.',
+  turnNameDefends: '{name} отбивается …',
+  turnAllBeatenWait: 'Всё побито – ждём, подкинут ли ещё …',
+  turnAllBeatenNeighbors: 'Всё побито – подкидывать могут только соседи.',
+  turnWaitOthers: 'Ждём остальных …',
+  turnAllBeatenThrowIn: 'Всё побито. Подкинь подходящие карты или нажми «Бито».',
+
+  draw: 'Ничья',
+  youAreThe: 'Ты –',
+  nameIsThe: '{name} –',
+  durakCounter: 'Счёт дураков',
+  oneMoreGame: 'Ещё партию!',
+  hostCanRestart: 'Хозяин может начать новую партию.',
+
+  chat: 'Чат',
+  chatUnread: 'Чат – {n} новых',
+  chatEmpty: 'Пока пусто. Нажми на фигурку, чтобы что-нибудь бросить 🍅',
+  message: 'Сообщение',
+  messagePlaceholder: 'Сообщение …',
+  send: 'Отправить',
+  quickOnly: 'Открытая комната: только быстрые фразы.',
+  throwAt: 'Бросить в {name}',
+  throwAtLabel: 'Бросить что-нибудь в {name}',
+  thePlayer: 'игрока',
+  'item.tomato': 'Помидор',
+  'item.egg': 'Яйцо',
+  'item.slipper': 'Тапок',
+  'item.fish': 'Рыба',
+  'item.flowers': 'Цветы',
+};
+
+const DICTS: Record<Lang, Record<Key, string>> = { de, en, ru };
+
+export const LANG_NAMES: Record<Lang, string> = { de: 'Deutsch', en: 'English', ru: 'Русский' };
+
+const KEY = 'durak.lang';
+
+function detect(): Lang {
+  try {
+    const saved = localStorage.getItem(KEY) as Lang | null;
+    if (saved && LANGS.includes(saved)) return saved;
+  } catch {
+    /* egal */
+  }
+  const nav = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
+  if (nav.startsWith('de')) return 'de';
+  if (/^(ru|uk|be|kk)/.test(nav)) return 'ru';
+  return 'en';
+}
+
+let lang = detect();
+document.documentElement.lang = lang;
+const listeners = new Set<() => void>();
+
+export const getLang = () => lang;
+
+export function setLang(next: Lang): void {
+  lang = next;
+  document.documentElement.lang = next;
+  try {
+    localStorage.setItem(KEY, next);
+  } catch {
+    /* nur für diese Sitzung */
+  }
+  listeners.forEach((fn) => fn());
+}
+
+/** In der obersten Komponente aufrufen – dann zeichnet sich bei einem Wechsel alles neu. */
+export const useLang = () =>
+  useSyncExternalStore(
+    (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    getLang,
+  );
+
+/** Text in der aktuellen Sprache, Platzhalter {x} werden ersetzt. */
+export function t(key: Key, params: Record<string, string | number> = {}): string {
+  const text = DICTS[lang][key] ?? de[key];
+  return text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
+}
+
+/** Meldung vom Server (immer Deutsch) in die aktuelle Sprache */
+export const serverText = (message: string) => translateServer(message, lang);

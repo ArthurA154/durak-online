@@ -13,6 +13,7 @@ import {
   type ThrowItem,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  THROW_IN_MS,
   TURN_MS,
   type GameView,
   type Session,
@@ -42,6 +43,7 @@ export interface Room {
   /** Zug-Timer */
   deadline: number | null;
   timer: ReturnType<typeof setTimeout> | null;
+  timerKind: 'turn' | 'throwIn';
   /** Durak der letzten Partie (Narrenkappe, mischt, fängt an) */
   lastDurakId: string | null;
   dealerId: string | null;
@@ -116,6 +118,7 @@ export class RoomManager {
       emptySince: null,
       deadline: null,
       timer: null,
+      timerKind: 'turn',
       lastDurakId: null,
       dealerId: null,
       round: 0,
@@ -124,7 +127,7 @@ export class RoomManager {
       gameStartedAt: null,
       gamePlayers: [],
       chat: [],
-      settings: { public: isPublic, neighborsOnly: false },
+      settings: { public: isPublic, neighborsOnly: false, unlimited: false },
       banned: new Set(),
     };
     this.rooms.set(code, room);
@@ -186,6 +189,7 @@ export class RoomManager {
     if (isRunning(room)) throw new GameError('Erst nach der Partie');
     if (typeof change?.public === 'boolean') room.settings.public = change.public;
     if (typeof change?.neighborsOnly === 'boolean') room.settings.neighborsOnly = change.neighborsOnly;
+    if (typeof change?.unlimited === 'boolean') room.settings.unlimited = change.unlimited;
   }
 
   /** Gastgeber wirft jemanden aus dem Raum (nicht während einer Partie). Gibt dessen Verbindung zurück. */
@@ -214,6 +218,7 @@ export class RoomManager {
         color: host.color,
         players: room.players.length,
         neighborsOnly: room.settings.neighborsOnly,
+        unlimited: room.settings.unlimited,
       });
     }
     return list.slice(0, 50);
@@ -234,7 +239,11 @@ export class RoomManager {
     const ids = room.players.map((p) => p.id);
     // Der Durak der letzten Partie mischt und greift zuerst an
     const durak = room.lastDurakId;
-    room.game = new DurakGame(ids, undefined, { firstAttackerId: durak, neighborsOnly: room.settings.neighborsOnly });
+    room.game = new DurakGame(ids, undefined, {
+      firstAttackerId: durak,
+      neighborsOnly: room.settings.neighborsOnly,
+      unlimited: room.settings.unlimited,
+    });
     room.dealerId = durak;
     room.round++;
     room.resultRecorded = false;
@@ -334,9 +343,14 @@ export class RoomManager {
    * In der Pause läuft kein Timer.
    */
   armTimer(room: Room, onTimeout: () => void): void {
+    const kind = isRunning(room) && room.game!.inThrowIn() ? 'throwIn' : 'turn';
+    // Der Nachlege-Countdown läuft durch – Nachlegen oder „Fertig“ setzen ihn nicht zurück
+    if (kind === 'throwIn' && room.timerKind === 'throwIn' && room.timer && !this.isPaused(room)) return;
     this.clearTimer(room);
     if (!isRunning(room) || this.isPaused(room)) return;
-    room.deadline = Date.now() + TURN_MS;
+    const ms = kind === 'throwIn' ? THROW_IN_MS : TURN_MS;
+    room.timerKind = kind;
+    room.deadline = Date.now() + ms;
     room.timer = setTimeout(() => {
       room.timer = null;
       room.deadline = null;
@@ -344,7 +358,7 @@ export class RoomManager {
       room.game!.timeout();
       this.recordResult(room);
       onTimeout();
-    }, TURN_MS);
+    }, ms);
   }
 
   clearTimer(room: Room): void {
@@ -397,7 +411,12 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
     durakId: g?.durakId ?? null,
     timer:
       g && !g.finished && room.deadline
-        ? { waitingOn: g.waitingOn(), remainingMs: Math.max(0, room.deadline - now) }
+        ? {
+            waitingOn: g.waitingOn(),
+            remainingMs: Math.max(0, room.deadline - now),
+            totalMs: room.timerKind === 'throwIn' ? THROW_IN_MS : TURN_MS,
+            kind: room.timerKind,
+          }
         : null,
     lastDurakId: room.lastDurakId,
     dealerId: room.dealerId,

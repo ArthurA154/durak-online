@@ -4,12 +4,14 @@ import { call, connectErrorText, loadSession, saveSession, socket } from './sock
 import { Home } from './Home';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
-import { AudioToggles } from './AudioToggles';
 import { Leaderboard } from './Leaderboard';
 import { Chat } from './Chat';
 import { FxLayer } from './FxLayer';
 import { setMe } from './social';
+import { Backdrop } from './Theme';
+import { Settings } from './Settings';
 import { useGameSounds } from './useGameSounds';
+import { t, useLang } from './i18n';
 
 /** Pro Verbindung nur einmal wiederverbinden (sonst kam es doppelt beim Server an) */
 let rejoinedSocket: string | undefined;
@@ -70,10 +72,11 @@ export function App() {
   }, []);
 
   useGameSounds(view);
+  useLang();
   useEffect(() => setMe(view?.you ?? null), [view?.you]);
 
   const leave = () => {
-    if (view?.phase === 'playing' && !window.confirm('Wirklich gehen? Du wirst aus dem laufenden Spiel entfernt.'))
+    if (view?.phase === 'playing' && !window.confirm(t('leaveConfirm')))
       return;
     socket.emit('room:leave');
     saveSession(null);
@@ -84,6 +87,7 @@ export function App() {
 
   return (
     <div className={`app${inGame ? ' in-game' : ''}`}>
+      <Backdrop />
       <header className="topbar">
         {view ? (
           <div className="topbar-left">
@@ -95,28 +99,28 @@ export function App() {
         )}
         <div className="topbar-right">
           {view && <Chat me={view.you} quickOnly={view.settings.public} />}
-          <AudioToggles />
+          <Settings />
           {view && (
             <button type="button" className="btn ghost small" onClick={leave}>
-              Raum verlassen
+              {t('leaveRoom')}
             </button>
           )}
         </div>
       </header>
       {!connected && (connectError || slow) && (
         <div className="conn-banner" role="alert">
-          {connectError || 'Verbinde mit dem Server …'}
+          {connectError || t('connecting')}
         </div>
       )}
       {notice && (
         <div className="notice-banner" role="status">
           <span>📢 {notice}</span>
-          <button type="button" aria-label="Schliessen" onClick={() => setNotice(null)}>
+          <button type="button" aria-label={t('close')} onClick={() => setNotice(null)}>
             ×
           </button>
         </div>
       )}
-      {!view && <Home message={kicked ? 'Der Gastgeber hat dich aus dem Raum entfernt.' : ''} />}
+      {!view && <Home message={kicked ? t('kicked') : ''} />}
       {view?.phase === 'lobby' && <Lobby view={view} />}
       {inGame && <Table view={view} />}
       {view && <FxLayer me={view.you} />}

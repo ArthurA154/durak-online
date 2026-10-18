@@ -3,17 +3,18 @@ import type { ThrowEvent, ThrowItem } from '@durak/shared';
 import { call, socket } from './socket';
 import { onMessage, onThrow } from './social';
 import { sfx, unlockAudio } from './audio';
+import { t } from './i18n';
 
 // Alles, was über dem Tisch „schwebt“: Sprechblasen, das Wurf-Menü, fliegende Sachen und Treffer.
 // Liegt als eigene Ebene über allem und sucht die Figuren über [data-seat="<id>"] .avatar –
 // so müssen Lobby und Tisch nichts davon wissen.
 
-export const ITEMS: { item: ThrowItem; emoji: string; label: string }[] = [
-  { item: 'tomato', emoji: '🍅', label: 'Tomate' },
-  { item: 'egg', emoji: '🥚', label: 'Ei' },
-  { item: 'slipper', emoji: '🥿', label: 'Hausschuh' },
-  { item: 'fish', emoji: '🐟', label: 'Fisch' },
-  { item: 'flowers', emoji: '💐', label: 'Blumen' },
+export const ITEMS: { item: ThrowItem; emoji: string }[] = [
+  { item: 'tomato', emoji: '🍅' },
+  { item: 'egg', emoji: '🥚' },
+  { item: 'slipper', emoji: '🥿' },
+  { item: 'fish', emoji: '🐟' },
+  { item: 'flowers', emoji: '💐' },
 ];
 
 const emojiOf = (item: ThrowItem) => ITEMS.find((i) => i.item === item)?.emoji ?? '🍅';
@@ -215,21 +216,21 @@ export function FxLayer({ me }: { me: string }) {
           ref={menuRef}
           className={`throw-menu${menu.rect.top < 170 ? ' below' : ''}`}
           role="menu"
-          aria-label={`Etwas auf ${menu.name || 'den Spieler'} werfen`}
+          aria-label={t('throwAtLabel', { name: menu.name || t('thePlayer') })}
           style={{
             left: Math.min(Math.max(menu.rect.left + menu.rect.width / 2, 140), vw - 140),
             top: menu.rect.top < 170 ? menu.rect.bottom + 10 : menu.rect.top - 10,
           }}
         >
-          {menu.name && <p className="throw-title">Auf {menu.name} werfen</p>}
+          {menu.name && <p className="throw-title">{t('throwAt', { name: menu.name })}</p>}
           <div className="throw-items">
             {ITEMS.map((i) => (
               <button
                 key={i.item}
                 type="button"
                 role="menuitem"
-                title={i.label}
-                aria-label={i.label}
+                title={t(`item.${i.item}`)}
+                aria-label={t(`item.${i.item}`)}
                 onClick={(e) => throwAt(menu.to, i.item, { x: e.clientX, y: e.clientY })}
               >
                 {i.emoji}

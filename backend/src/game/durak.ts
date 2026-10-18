@@ -52,13 +52,16 @@ export class DurakGame {
   durakId: string | null = null;
   /** Nachlegen nur für die beiden Nachbarn des Verteidigers (sonst alle) */
   readonly neighborsOnly: boolean;
+  /** Höchstzahl Angriffskarten pro Runde (Standard 6; „unbegrenzt“ = nur durch die Hand des Verteidigers) */
+  readonly maxTable: number;
 
   constructor(
     playerIds: string[],
     deck: Card[] = shuffle(createDeck()),
-    opts: { firstAttackerId?: string | null; neighborsOnly?: boolean } = {},
+    opts: { firstAttackerId?: string | null; neighborsOnly?: boolean; unlimited?: boolean } = {},
   ) {
     this.neighborsOnly = !!opts.neighborsOnly;
+    this.maxTable = opts.unlimited ? Infinity : MAX_TABLE;
     if (playerIds.length < MIN_PLAYERS || playerIds.length > MAX_PLAYERS) {
       throw new GameError(`${MIN_PLAYERS}–${MAX_PLAYERS} Spieler nötig`);
     }
@@ -96,6 +99,11 @@ export class DurakGame {
     if (p === this.defender || p.hand.length === 0) return false;
     if (!this.neighborsOnly) return true;
     return p === this.attacker || p === this.players[this.nextActive(this.defenderIdx)];
+  }
+
+  /** Nur noch Nachlegen offen (Verteidiger schluckt oder hat alles geschlagen)? */
+  inThrowIn(): boolean {
+    return !this.finished && this.table.length > 0 && (this.taking || this.table.every((t) => t.defense !== null));
   }
 
   /** Wer darf in dieser Runde nachlegen? */
@@ -152,7 +160,7 @@ export class DurakGame {
     if (this.table.some((t) => t.attack.rank !== card.rank)) {
       throw new GameError('Weiterschieben nur mit einer Karte gleichen Werts');
     }
-    if (this.table.length + 1 > MAX_TABLE) throw new GameError('Zu viele Karten auf dem Tisch');
+    if (this.table.length + 1 > this.maxTable) throw new GameError('Zu viele Karten auf dem Tisch');
 
     const nextIdx = this.nextActive(this.defenderIdx);
     const next = this.players[nextIdx];
@@ -291,7 +299,7 @@ export class DurakGame {
 
   private roomForAttack(): boolean {
     const undefended = this.table.filter((t) => !t.defense).length;
-    return this.table.length < MAX_TABLE && undefended < this.defender.hand.length;
+    return this.table.length < this.maxTable && undefended < this.defender.hand.length;
   }
 
   private endBout(): void {

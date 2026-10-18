@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { GameView } from '@durak/shared';
 import { Avatar } from './Avatar';
+import { t } from './i18n';
 
 const OPEN_KEY = 'durak.leaderboard';
 
@@ -36,13 +37,13 @@ export function Leaderboard({ view }: { view: GameView }) {
         className="leaderboard-toggle"
         aria-expanded={open}
         onClick={toggle}
-        title="Durak-Zähler"
+        title={t('durakCounter')}
       >
         <span className="leaderboard-icon">🏆</span>
         <span className="leaderboard-caret">{open ? '▴' : '▾'}</span>
       </button>
       {open && (
-        <ol className="leaderboard-list" aria-label="Durak-Zähler">
+        <ol className="leaderboard-list" aria-label={t('durakCounter')}>
           {ranking.map((p) => (
             <li key={p.id} className={p.id === view.you ? 'is-me' : undefined}>
               <span className="avatar tiny">

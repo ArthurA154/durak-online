@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, Result, ServerToClientEvents, Session } from '@durak/shared';
+import { serverText, t } from './i18n';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
 const SESSION_KEY = 'durak.session';
@@ -33,13 +34,13 @@ export function call<T>(send: (ack: (r: Result<T>) => void) => void): Promise<T>
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
       reject(
-        new Error(socket.connected ? 'Keine Antwort vom Server – versuch es nochmal' : 'Keine Verbindung zum Server'),
+        new Error(socket.connected ? t('noAnswer') : t('noConnection')),
       );
     }, CALL_TIMEOUT_MS);
     send((r) => {
       window.clearTimeout(timer);
       if (r.ok) resolve(r as T);
-      else reject(new Error(r.error));
+      else reject(new Error(serverText(r.error)));
     });
   });
 }
@@ -48,5 +49,5 @@ export function call<T>(send: (ack: (r: Result<T>) => void) => void): Promise<T>
 export function connectErrorText(err: Error): string {
   const technical = /xhr|poll|websocket|timeout|transport/i.test(err.message);
   // Eigene Meldungen vom Server (z. B. „Zu viele Verbindungen …“) unverändert anzeigen
-  return technical || !err.message ? 'Server nicht erreichbar – neuer Versuch läuft …' : err.message;
+  return technical || !err.message ? t('serverUnreachable') : serverText(err.message);
 }

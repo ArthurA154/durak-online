@@ -21,6 +21,7 @@ import { call, socket } from './socket';
 import { turnInfo } from './turn';
 import { useCountdown } from './useCountdown';
 import { sfx } from './audio';
+import { t } from './i18n';
 
 /** Leichte, pro Karte feste Schräglage – wie hingeworfen. */
 const tilt = (c: Card) => ((c.rank * 7 + SUITS.indexOf(c.suit) * 13) % 11) - 5;
@@ -60,6 +61,38 @@ function expressionFor(view: GameView, id: string): Expression {
   if (view.defenderId === id && view.taking) return 'shocked';
   if (view.defenderId === id && view.table.some((t) => !t.defense)) return 'focus';
   return 'neutral';
+}
+
+/** Abstand zwischen zwei nachgezogenen Karten */
+const DRAW_STEP_MS = 500;
+/** Kurz warten, bis die alten Tischkarten weggeflogen sind */
+const DRAW_DELAY_MS = 350;
+const DRAW_FLY_MS = 430;
+
+/**
+ * Runde vorbei und nachgezogen? Dann: wer bekommt in welcher Reihenfolge wie viele Karten.
+ * Wie auf dem Server: Angreifer zuerst, dann reihum, Verteidiger zuletzt. Eine ID pro Karte.
+ */
+function drawOrder(prev: GameView, view: GameView): string[] | null {
+  if (prev.round !== view.round || prev.phase !== 'playing') return null;
+  if (prev.table.length === 0 || view.table.length > 0) return null;
+  const total = prev.deckCount - view.deckCount;
+  if (total <= 0) return null;
+  const took = view.discardCount === prev.discardCount;
+  const tableCards = prev.table.reduce((n, t) => n + (t.defense ? 2 : 1), 0);
+  const ids = prev.players.map((p) => p.id);
+  const start = Math.max(0, ids.indexOf(prev.attackerId ?? ''));
+  const order = [...ids.slice(start), ...ids.slice(0, start)].filter((id) => id !== prev.defenderId);
+  if (prev.defenderId) order.push(prev.defenderId);
+  const steps: string[] = [];
+  for (const id of order) {
+    const before = prev.players.find((p) => p.id === id)?.cardCount;
+    const after = view.players.find((p) => p.id === id)?.cardCount;
+    if (before === undefined || after === undefined) return null;
+    const drawn = after - before - (took && id === prev.defenderId ? tableCards : 0);
+    for (let i = 0; i < drawn; i++) steps.push(id);
+  }
+  return steps.length === total ? steps : null;
 }
 
 /** Frisch ausgeteilt? (beim ersten Anzeigen des Tisches – nicht nach einem Neuladen mitten im Spiel) */
@@ -106,6 +139,21 @@ export function Table({ view }: { view: GameView }) {
     const t = setTimeout(() => setDealing(false), SHUFFLE_MS);
     return () => clearTimeout(t);
   }, [view.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nachziehen nach der Runde: Karte für Karte vom Stapel, Reihenfolge wie auf dem Server
+  const draws = useRef<{ steps: string[]; start: number } | null>(null);
+  const [, setDrawTick] = useState(0);
+  const newDraws = prev && prev !== view && !newRound ? drawOrder(prev, view) : null;
+  if (newDraws) draws.current = { steps: newDraws, start: Date.now() + DRAW_DELAY_MS };
+  const drawNow = Date.now();
+  const drawInfo = draws.current;
+  /** Karten, die bei diesem Spieler noch nicht angekommen sind */
+  const drawPending = (id: string) =>
+    drawInfo
+      ? drawInfo.steps.filter((s, i) => s === id && drawNow < drawInfo.start + i * DRAW_STEP_MS + DRAW_FLY_MS).length
+      : 0;
+  /** Karten, die noch auf dem Stapel liegen sollten (noch nicht losgeflogen) */
+  const deckPending = drawInfo ? drawInfo.steps.filter((_, i) => drawNow < drawInfo.start + i * DRAW_STEP_MS).length : 0;
 
   const me = view.you;
   const meInfo = view.players.find((p) => p.id === me);
@@ -154,6 +202,33 @@ export function Table({ view }: { view: GameView }) {
     if (hc) handCw.current = hc.offsetWidth;
   });
 
+  // Läuft weiter, auch wenn schon der nächste Zug kommt – nur ein neues Nachziehen ersetzt es
+  const drawKey = drawInfo?.start ?? 0;
+  useEffect(() => {
+    const d = draws.current;
+    if (!d) return;
+    const timers: number[] = [];
+    d.steps.forEach((id, i) => {
+      const launch = d.start + i * DRAW_STEP_MS - Date.now();
+      timers.push(
+        window.setTimeout(() => {
+          sfx.draw();
+          setDrawTick((n) => n + 1);
+          if (id !== me) flyBack(deckPoint(), seatPoint(id));
+        }, Math.max(0, launch)),
+      );
+      timers.push(window.setTimeout(() => setDrawTick((n) => n + 1), Math.max(0, launch + DRAW_FLY_MS)));
+    });
+    const end = d.start + d.steps.length * DRAW_STEP_MS + DRAW_FLY_MS - Date.now();
+    timers.push(
+      window.setTimeout(() => {
+        if (draws.current === d) draws.current = null;
+        setDrawTick((n) => n + 1);
+      }, end + 50),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [drawKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Breite der Hand beobachten (für das Auffächern)
   useEffect(() => {
     const el = handRef.current;
@@ -163,11 +238,16 @@ export function Table({ view }: { view: GameView }) {
     return () => ro.disconnect();
   }, []);
 
-  // Ticken in den letzten 5 Sekunden, wenn ich dran bin
-  const tickSecond = myCountdown && myCountdown.seconds <= 5 && myCountdown.seconds > 0 ? myCountdown.seconds : null;
+  // Ticken in den letzten 5 Sekunden, wenn ich dran bin.
+  // Beim Nachlege-Countdown hören es alle: klick … klick … KLACK
+  const throwInSecond = countdown?.kind === 'throwIn' && countdown.seconds > 0 ? countdown.seconds : null;
+  const tickSecond =
+    throwInSecond ?? (myCountdown && myCountdown.seconds <= 5 && myCountdown.seconds > 0 ? myCountdown.seconds : null);
   useEffect(() => {
-    if (tickSecond) sfx.tick();
-  }, [tickSecond]);
+    if (!tickSecond) return;
+    if (throwInSecond === 1) sfx.tickLast();
+    else sfx.tick();
+  }, [tickSecond]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Feiern: wer raus ist, bekommt Konfetti
   useEffect(() => {
@@ -177,7 +257,7 @@ export function Table({ view }: { view: GameView }) {
       if (!p.out || !before || before.out) continue;
       const at = p.id === me ? pointOf('.me-chip .avatar') : seatPoint(p.id);
       if (at) setBursts((b) => [...b, { id: Math.random(), at }]);
-      setBanner(p.id === me ? 'Du bist raus! 🎉' : `${p.name} ist raus! 🎉`);
+      setBanner(p.id === me ? t('youAreOut') : t('nameIsOut', { name: p.name }));
     }
     if (prev.phase === 'playing' && finished && view.durakId !== me) {
       const at = pointOf('.arena');
@@ -220,10 +300,14 @@ export function Table({ view }: { view: GameView }) {
 
   // ---------- Was darf eine Karte gerade? ----------
 
+  // Wie viele Angriffskarten höchstens? Standard 6, sonst so viele, wie der Verteidiger halten kann
+  const maxTable = view.settings.unlimited ? Infinity : MAX_TABLE;
+  const defenderCards = view.players.find((p) => p.id === view.defenderId)?.cardCount ?? 0;
   const canAttackWith = (c: Card) =>
     !finished &&
     !isDefender &&
-    view.table.length < MAX_TABLE &&
+    view.table.length < maxTable &&
+    (view.table.length === 0 || undefended < defenderCards) &&
     (view.table.length === 0 ? isAttacker : view.throwers.includes(me) && tableRanks.has(c.rank));
 
   const defendTargets = (c: Card) =>
@@ -235,7 +319,7 @@ export function Table({ view }: { view: GameView }) {
     isDefender &&
     !view.taking &&
     view.table.length > 0 &&
-    view.table.length < MAX_TABLE &&
+    view.table.length < maxTable &&
     view.table.every((t) => !t.defense && t.attack.rank === c.rank);
 
   /** Kann diese Karte jetzt etwas Sinnvolles tun? → in der Hand hervorheben */
@@ -260,7 +344,7 @@ export function Table({ view }: { view: GameView }) {
     if (canTransferWith(card)) return transfer(card);
     const targets = defendTargets(card);
     if (targets.length === 1) return defend(card, targets[0]);
-    if (targets.length > 1) setError('Zieh die Karte direkt auf die Karte, die du schlagen willst');
+    if (targets.length > 1) setError(t('dragOntoTarget'));
   };
 
   const active = dragging ?? selected;
@@ -301,7 +385,16 @@ export function Table({ view }: { view: GameView }) {
   const half = Math.ceil(n / 2);
   const handRows = twoRows ? [view.hand.slice(0, half), view.hand.slice(half)] : [view.hand];
   const newInHand = view.hand.filter((c) => !prev?.hand.some((h) => sameCard(h, c)));
+  // Meine nachgezogenen Karten (ohne geschluckte Tischkarten) und ihre Plätze in der Reihenfolge
+  const myDraws = newDraws ? newInHand.filter((c) => !prev?.table.some((t) => sameCard(t.attack, c) || (t.defense && sameCard(t.defense, c)))) : [];
+  const myDrawSlots = drawInfo ? drawInfo.steps.flatMap((id, i) => (id === me ? [i] : [])) : [];
   const dealer = view.players.find((p) => p.id === view.dealerId);
+  // Mehr als 6 Paare (nur ohne 6er-Grenze): mehr Spalten bzw. Reihen, Karten kleiner (siehe .play-area.many)
+  const manyCols = window.innerWidth <= 700 ? 3 : Math.ceil(view.table.length / 2);
+  const manyStyle =
+    view.table.length > 6
+      ? ({ '--cols': manyCols, '--rows': Math.ceil(view.table.length / manyCols) } as CSSProperties)
+      : undefined;
 
   return (
     <main className="game">
@@ -310,20 +403,20 @@ export function Table({ view }: { view: GameView }) {
           <div
             className="deck"
             ref={deckRef}
-            aria-label={`Stapel: ${view.deckCount} Karten, Trumpf ${suitSymbol(trump)}`}
+            aria-label={t('deckLabel', { n: view.deckCount + deckPending, suit: suitSymbol(trump) })}
           >
             {view.trumpCard && (
               <div className="deck-trump">
                 <CardFace card={view.trumpCard} mini />
               </div>
             )}
-            {view.deckCount > 1 && (
+            {view.deckCount + deckPending > 1 && (
               <div className="deck-stack">
                 <CardBack mini />
-                <span className="deck-count">{view.deckCount}</span>
+                <span className="deck-count">{view.deckCount + deckPending}</span>
               </div>
             )}
-            <div className={`trump-only ${isRed(trump) ? 'red' : ''}`} title="Trumpf">
+            <div className={`trump-only ${isRed(trump) ? 'red' : ''}`} title={t('trump')}>
               {suitSymbol(trump)}
             </div>
           </div>
@@ -332,11 +425,13 @@ export function Table({ view }: { view: GameView }) {
             className={[
               'play-area',
               view.table.length >= 4 && 'two-rows',
+              view.table.length > 6 && 'many',
               tableGlows && 'glow',
               hover === 'table' && tableGlows && 'hot',
             ]
               .filter(Boolean)
               .join(' ')}
+            style={manyStyle}
             data-drop="table"
           >
             {view.table.map((pair, i) => {
@@ -367,7 +462,7 @@ export function Table({ view }: { view: GameView }) {
             })}
           </div>
 
-          <div className="discard" ref={discardRef} aria-label={`Ablage: ${view.discardCount} Karten`}>
+          <div className="discard" ref={discardRef} aria-label={t('discardLabel', { n: view.discardCount })}>
             {view.discardCount > 0 &&
               [0, 1, 2]
                 .slice(0, Math.min(3, Math.ceil(view.discardCount / 6)))
@@ -387,10 +482,10 @@ export function Table({ view }: { view: GameView }) {
                 </div>
                 <p className="shuffle-text">
                   {!dealer
-                    ? 'Es wird gemischt …'
+                    ? t('shuffling')
                     : dealer.id === me
-                      ? 'Du warst der Durak – du mischst!'
-                      : `${dealer.name} war der Durak und muss mischen`}
+                      ? t('youShuffle')
+                      : t('nameShuffles', { name: dealer.name })}
                 </p>
               </motion.div>
             )}
@@ -438,19 +533,19 @@ export function Table({ view }: { view: GameView }) {
             done={view.passed.includes(p.id)}
             offline={!p.connected}
             out={p.out}
-            cardCount={p.cardCount}
+            cardCount={p.cardCount - drawPending(p.id)}
             countdown={timedFor(p.id)}
             note={
               p.out
-                ? 'raus'
+                ? t('isOut')
                 : !p.connected
-                  ? 'Raucherpause 🚬'
+                  ? t('smokeBreak')
                   : p.id === view.attackerId
-                    ? 'greift an'
+                    ? t('attacks')
                     : p.id === view.defenderId
                       ? view.taking
-                        ? 'schluckt'
-                        : 'verteidigt'
+                        ? t('takes')
+                        : t('defends')
                       : undefined
             }
           />
@@ -476,21 +571,21 @@ export function Table({ view }: { view: GameView }) {
             <p className="turn-text my-timer" role="timer">
               <span className="my-timer-num">{myCountdown.seconds}</span>
               {view.table.length === 0
-                ? 'Sekunden – sonst wird deine kleinste Karte gespielt'
+                ? t('secondsLowest')
                 : isDefender
-                  ? 'Sekunden – sonst schluckst du'
-                  : 'Sekunden – sonst bist du fertig'}
+                  ? t('secondsTake')
+                  : t('secondsDone')}
             </p>
           ) : (
             <p className="turn-text" aria-live="polite">
-              {dealing ? '' : view.paused ? 'Pause – warte, bis alle wieder da sind' : turn.text}
+              {dealing ? '' : view.paused ? t('pausedWait') : turn.text}
             </p>
           )}
           {!finished && (
             <div className="actions">
               {isDefender && selected && activeTransfer && (
                 <button type="button" className="btn" onClick={() => transfer(selected)}>
-                  Weiterschieben
+                  {t('transfer')}
                 </button>
               )}
               {isDefender && view.table.length > 0 && !view.taking && !allDefended && (
@@ -499,7 +594,7 @@ export function Table({ view }: { view: GameView }) {
                   className="btn danger"
                   onClick={() => send((ack) => socket.emit('game:take', ack))}
                 >
-                  Schlucken
+                  {t('take')}
                 </button>
               )}
               {!isDefender &&
@@ -509,7 +604,7 @@ export function Table({ view }: { view: GameView }) {
                 !view.passed.includes(me) &&
                 n > 0 && (
                   <button type="button" className="btn" onClick={() => send((ack) => socket.emit('game:pass', ack))}>
-                    Fertig
+                    {t('done')}
                   </button>
                 )}
             </div>
@@ -535,14 +630,20 @@ export function Table({ view }: { view: GameView }) {
                 const lift = isSel ? -34 : canUse ? -14 : 0;
                 const wait = Math.max(0, dealUntil.current - Date.now());
                 const newIdx = newInHand.findIndex((c) => sameCard(c, card));
+                // Nachgezogen (nicht vom Tisch geschluckt)? Dann zu „meinem“ Zeitpunkt in der Reihenfolge
+                const drawIdx = newDraws ? myDraws.findIndex((c) => sameCard(c, card)) : -1;
+                const drawDelay =
+                  drawIdx >= 0 && drawInfo
+                    ? Math.max(0, drawInfo.start + myDrawSlots[drawIdx] * DRAW_STEP_MS - Date.now())
+                    : null;
                 return (
                   <FlySlot
                     key={cardKey(card)}
                     className={`hand-slot${isSel || (dragging && sameCard(dragging, card)) ? ' is-selected' : ''}`}
                     style={{ zIndex: i + 1, marginLeft: i === 0 ? 0 : step - cw }}
                     from={() => fromTable(card) ?? deckPoint()}
-                    delay={wait + Math.max(0, newIdx) * 80}
-                    fade={wait > 0}
+                    delay={drawDelay ?? wait + Math.max(0, newIdx) * 80}
+                    fade={wait > 0 || drawDelay !== null}
                     registry={registry}
                     registryKey={cardKey(card)}
                   >
@@ -708,12 +809,12 @@ function Finished({ view }: { view: GameView }) {
         transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.35 }}
       >
         <p className="result-who">
-          {!durak ? 'Unentschieden' : durak.id === view.you ? 'Du bist der' : `${durak.name} ist der`}
+          {!durak ? t('draw') : durak.id === view.you ? t('youAreThe') : t('nameIsThe', { name: durak.name })}
         </p>
         <h2 className="result-word">{durak ? 'Дурак' : 'Ничья'}</h2>
       </motion.div>
 
-      <ul className="scoreboard" aria-label="Durak-Zähler">
+      <ul className="scoreboard" aria-label={t('durakCounter')}>
         {ranking.map((p) => (
           <li key={p.id}>
             <span className="avatar small">
@@ -727,10 +828,10 @@ function Finished({ view }: { view: GameView }) {
 
       {isHost ? (
         <button type="button" className="btn" onClick={restart}>
-          Noch ein Spiel!
+          {t('oneMoreGame')}
         </button>
       ) : (
-        <p className="result-wait">Der Gastgeber kann eine neue Runde starten.</p>
+        <p className="result-wait">{t('hostCanRestart')}</p>
       )}
     </motion.div>
   );
@@ -760,7 +861,7 @@ function PauseOverlay({ view }: { view: GameView }) {
 
   return (
     <motion.div className="pause" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="status">
-      <p className="pause-title">Pause</p>
+      <p className="pause-title">{t('pause')}</p>
       {away.map((p) => {
         const left = Math.max(0, Math.ceil((AWAY_KICK_MS - (p.awayMs! + now - receivedAt)) / 1000));
         return (
@@ -768,12 +869,12 @@ function PauseOverlay({ view }: { view: GameView }) {
             <span className="avatar small">
               <Avatar color={p.color} expression="neutral" seed={p.id} />
             </span>
-            <span className="pause-who">{p.name} macht Raucherpause 🚬</span>
+            <span className="pause-who">{t('nameSmokeBreak', { name: p.name })}</span>
             {left > 0 ? (
-              <span className="pause-wait">Noch {left} s</span>
+              <span className="pause-wait">{t('waitSeconds', { n: left })}</span>
             ) : (
               <button type="button" className="btn small" onClick={() => kick(p.id)}>
-                Ohne {p.name} weiterspielen
+                {t('playWithout', { name: p.name })}
               </button>
             )}
           </div>
@@ -782,4 +883,22 @@ function PauseOverlay({ view }: { view: GameView }) {
       {error && <p className="form-error">{error}</p>}
     </motion.div>
   );
+}
+
+/** Ein Kartenrücken fliegt vom Stapel zum Platz eines Mitspielers (nur Optik). */
+function flyBack(from: Point | null, to: Point | null): void {
+  if (!from || !to || typeof document.body.animate !== 'function') return;
+  const el = document.createElement('div');
+  el.className = 'card back mini draw-flyer';
+  el.style.left = `${from.x}px`;
+  el.style.top = `${from.y}px`;
+  document.body.append(el);
+  const anim = el.animate(
+    [
+      { transform: 'translate(-50%, -50%) rotate(-8deg)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) rotate(10deg) scale(0.8)`, opacity: 0.9 },
+    ],
+    { duration: DRAW_FLY_MS, easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)' },
+  );
+  anim.onfinish = () => el.remove();
 }
