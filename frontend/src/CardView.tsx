@@ -6,12 +6,13 @@ const RANK_LABEL: Record<number, string> = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' 
 
 export const suitSymbol = (s: Suit) => SUIT_SYMBOL[s];
 export const isRed = (s: Suit) => s === 'H' || s === 'D';
-export const rankLabel = (c: Card) => RANK_LABEL[c.rank] ?? String(c.rank);
+const rankLabel = (c: Card) => RANK_LABEL[c.rank] ?? String(c.rank);
 export const cardKey = (c: Card) => `${c.rank}${c.suit}`;
 
 // Klassische Anordnung der Symbole: [x %, y %]
 const L = 27;
 const R = 73;
+// prettier-ignore
 const PIPS: Record<number, [number, number][]> = {
   6: [[L, 20], [L, 50], [L, 80], [R, 20], [R, 50], [R, 80]],
   7: [[L, 20], [L, 50], [L, 80], [R, 20], [R, 50], [R, 80], [50, 35]],

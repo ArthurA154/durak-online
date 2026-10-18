@@ -67,10 +67,18 @@ export function Lobby({ view }: { view: GameView }) {
               expression="happy"
               hat={p.id === view.lastDurakId}
               offline={!p.connected}
-              note={[p.id === view.you && t('you'), p.id === view.hostId && t('host')].filter(Boolean).join(', ') || undefined}
+              note={
+                [p.id === view.you && t('you'), p.id === view.hostId && t('host')].filter(Boolean).join(', ') ||
+                undefined
+              }
               action={
                 isHost && p.id !== view.you ? (
-                  <button type="button" className="kick-btn" onClick={() => kick(p.id)} aria-label={t('kickName', { name: p.name })}>
+                  <button
+                    type="button"
+                    className="kick-btn"
+                    onClick={() => kick(p.id)}
+                    aria-label={t('kickName', { name: p.name })}
+                  >
                     {t('kick')}
                   </button>
                 ) : undefined
@@ -111,12 +119,22 @@ export function Lobby({ view }: { view: GameView }) {
             ]}
             onChange={(v) => change({ unlimited: v })}
           />
+          <Segmented
+            label={t('hints')}
+            value={view.settings.hints}
+            options={[
+              { value: false, label: t('hintsOff') },
+              { value: true, label: t('hintsOn') },
+            ]}
+            onChange={(v) => change({ hints: v })}
+          />
         </div>
       ) : (
         <p className="lobby-note">
           {view.settings.public ? t('publicRoom') : t('privateRoom')} · {t('throwIn')}:{' '}
           {view.settings.neighborsOnly ? t('throwInNeighbors') : t('throwInAll')} ·{' '}
           {view.settings.unlimited ? t('attackUnlimited') : t('attackMax6')}
+          {view.settings.hints ? ` · ${t('hintsNote')}` : ''}
         </p>
       )}
 

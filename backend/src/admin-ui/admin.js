@@ -20,8 +20,7 @@ function el(tag, props = {}, ...children) {
         const i = decl.indexOf(':');
         if (i > 0) e.style.setProperty(decl.slice(0, i).trim(), decl.slice(i + 1).trim());
       }
-    }
-    else if (k === 'text') e.textContent = v;
+    } else if (k === 'text') e.textContent = v;
     else e.setAttribute(k, v);
   }
   for (const c of children) if (c != null) e.append(c);
@@ -222,7 +221,10 @@ function table(r, now) {
       'div',
       { class: 'table-meta' },
       el('span', { class: 'code', text: r.code }),
-      el('span', { class: 'dim', text: `${r.public ? 'öffentlich' : 'privat'}${r.neighborsOnly ? ' · Nachbarn' : ''} · ${r.players.length}/4` }),
+      el('span', {
+        class: 'dim',
+        text: `${r.public ? 'öffentlich' : 'privat'}${r.neighborsOnly ? ' · Nachbarn' : ''} · ${r.players.length}/4`,
+      }),
     ),
     players,
   );
@@ -240,7 +242,7 @@ function renderDays(days) {
   const step = iw / days.length;
   const bw = Math.max(3, step * 0.62);
 
-  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`});
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
   for (const f of [0, 0.5, 1]) {
     const y = pad.t + ih * (1 - f);
     root.append(svg('line', { class: 'grid', x1: pad.l, x2: W - pad.r, y1: y, y2: y }));
@@ -267,7 +269,15 @@ function renderDays(days) {
   });
 
   const pts = days.map((d, i) => `${pad.l + i * step + step / 2},${pad.t + ih - (d.visitors / maxVis) * ih}`);
-  root.append(svg('polyline', { points: pts.join(' '), fill: 'none', stroke: '#51cf66', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  root.append(
+    svg('polyline', {
+      points: pts.join(' '),
+      fill: 'none',
+      stroke: '#51cf66',
+      'stroke-width': 2,
+      'stroke-linejoin': 'round',
+    }),
+  );
 
   box.replaceChildren(root);
 }
@@ -338,7 +348,7 @@ function renderHour(samples) {
   const pad = { l: 28, r: 30, t: 6, b: 6 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
-  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`});
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
   if (samples.length < 3) {
     box.replaceChildren(el('div', { class: 'chart-wait', text: 'sammelt Daten …' }));
     return;
@@ -362,7 +372,13 @@ function renderHour(samples) {
     const yy = pad.t + ih * (1 - f);
     root.append(svg('line', { class: 'grid', x1: pad.l, x2: W - pad.r, y1: yy, y2: yy }));
   }
-  root.append(svg('text', { class: 'axis', x: pad.l - 6, y: pad.t + 4, 'text-anchor': 'end', fill: '#ff5148' }, `${Math.round(maxCpu)}%`));
+  root.append(
+    svg(
+      'text',
+      { class: 'axis', x: pad.l - 6, y: pad.t + 4, 'text-anchor': 'end', fill: '#ff5148' },
+      `${Math.round(maxCpu)}%`,
+    ),
+  );
   root.append(svg('text', { class: 'axis', x: W - pad.r + 6, y: pad.t + 4, fill: '#74c0fc' }, num(maxOn)));
   root.append(line('online', maxOn, '#74c0fc'));
   root.append(line('cpu', maxCpu, '#ff5148'));

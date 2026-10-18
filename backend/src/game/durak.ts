@@ -101,9 +101,9 @@ export class DurakGame {
     return p === this.attacker || p === this.players[this.nextActive(this.defenderIdx)];
   }
 
-  /** Nur noch Nachlegen offen (Verteidiger schluckt oder hat alles geschlagen)? */
+  /** Verteidiger schluckt – die anderen dürfen nur noch kurz nachlegen (Countdown) */
   inThrowIn(): boolean {
-    return !this.finished && this.table.length > 0 && (this.taking || this.table.every((t) => t.defense !== null));
+    return !this.finished && this.table.length > 0 && this.taking;
   }
 
   /** Wer darf in dieser Runde nachlegen? */
@@ -274,11 +274,7 @@ export class DurakGame {
     // Stapel leer und nur noch einer hat Karten → sofort Schluss, der ist der Durak.
     // Ausnahme: Er verteidigt und kann alles mit seinen letzten Karten schlagen → er darf es
     // versuchen; schafft er es, ist es unentschieden.
-    if (
-      this.deck.length === 0 &&
-      this.players.filter((p) => p.hand.length > 0).length <= 1 &&
-      !this.canStillDraw()
-    ) {
+    if (this.deck.length === 0 && this.players.filter((p) => p.hand.length > 0).length <= 1 && !this.canStillDraw()) {
       const cards = this.table.reduce((n, t) => n + (t.defense ? 2 : 1), 0);
       this.discardCount += cards;
       this.table = [];
@@ -315,9 +311,7 @@ export class DurakGame {
 
     if (this.finishIfOver()) return;
 
-    this.attackerIdx = tookCards
-      ? this.nextActive(this.defenderIdx)
-      : this.firstActiveFrom(this.defenderIdx);
+    this.attackerIdx = tookCards ? this.nextActive(this.defenderIdx) : this.firstActiveFrom(this.defenderIdx);
     this.defenderIdx = this.nextActive(this.attackerIdx);
   }
 
@@ -332,7 +326,10 @@ export class DurakGame {
       hand.some(
         (card, i) =>
           beats(attacks[0], card, this.trump) &&
-          match(attacks.slice(1), hand.filter((_, j) => j !== i)),
+          match(
+            attacks.slice(1),
+            hand.filter((_, j) => j !== i),
+          ),
       );
     return match(open, d.hand);
   }

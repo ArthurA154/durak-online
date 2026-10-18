@@ -8,12 +8,16 @@ const de = {
   // Allgemein
   leaveRoom: 'Raum verlassen',
   leaveConfirm: 'Wirklich gehen? Du wirst aus dem laufenden Spiel entfernt.',
+  stay: 'Bleiben',
   connecting: 'Verbinde mit dem Server …',
   serverUnreachable: 'Server nicht erreichbar – neuer Versuch läuft …',
   noAnswer: 'Keine Antwort vom Server – versuch es nochmal',
   noConnection: 'Keine Verbindung zum Server',
   kicked: 'Der Gastgeber hat dich aus dem Raum entfernt.',
+  gameGone: 'Zurück ins letzte Spiel ging nicht – der Raum ist weg oder die anderen spielen ohne dich weiter.',
   close: 'Schliessen',
+  privacy: 'Datenschutz',
+  sourceCode: 'Quellcode auf GitHub',
 
   // Einstellungen
   settings: 'Einstellungen',
@@ -73,6 +77,10 @@ const de = {
   unlimited: 'Unbegrenzt',
   attackMax6: 'max. 6 Karten',
   attackUnlimited: 'ohne 6er-Grenze',
+  hints: 'Spielhilfen',
+  hintsOn: 'An',
+  hintsOff: 'Aus',
+  hintsNote: 'Spielhilfen an',
   startGame: 'Spiel starten',
   waitingForPlayers: 'Warte auf Mitspieler …',
   hostStarts: 'Der Gastgeber startet das Spiel.',
@@ -154,12 +162,16 @@ export type Key = keyof typeof de;
 const en: Record<Key, string> = {
   leaveRoom: 'Leave room',
   leaveConfirm: "Really leave? You'll be removed from the running game.",
+  stay: 'Stay',
   connecting: 'Connecting to the server …',
   serverUnreachable: "Can't reach the server – retrying …",
   noAnswer: 'No answer from the server – try again',
   noConnection: 'No connection to the server',
   kicked: 'The host removed you from the room.',
+  gameGone: "Couldn't get back into your last game – the room is gone or the others played on without you.",
   close: 'Close',
+  privacy: 'Privacy',
+  sourceCode: 'Source code on GitHub',
 
   settings: 'Settings',
   language: 'Language',
@@ -216,6 +228,10 @@ const en: Record<Key, string> = {
   unlimited: 'Unlimited',
   attackMax6: 'max. 6 cards',
   attackUnlimited: 'no 6-card limit',
+  hints: 'Hints',
+  hintsOn: 'On',
+  hintsOff: 'Off',
+  hintsNote: 'hints on',
   startGame: 'Start game',
   waitingForPlayers: 'Waiting for players …',
   hostStarts: 'The host starts the game.',
@@ -257,7 +273,7 @@ const en: Record<Key, string> = {
   turnTakesNeighbors: '{name} takes – only the neighbours may throw in.',
   turnTakesWait: '{name} takes – waiting for the others …',
   turnTakesThrowIn: '{name} takes. Throw in matching cards or press “Done”.',
-  turnYouDefend: "You defend: drag a card onto the card you want to beat.",
+  turnYouDefend: 'You defend: drag a card onto the card you want to beat.',
   turnNameDefends: '{name} defends …',
   turnAllBeatenWait: 'All beaten – waiting to see if more comes …',
   turnAllBeatenNeighbors: 'All beaten – only the neighbours may throw in.',
@@ -291,12 +307,16 @@ const en: Record<Key, string> = {
 const ru: Record<Key, string> = {
   leaveRoom: 'Выйти',
   leaveConfirm: 'Точно уйти? Тебя уберут из текущей игры.',
+  stay: 'Остаться',
   connecting: 'Подключаемся к серверу …',
   serverUnreachable: 'Сервер недоступен – пробуем снова …',
   noAnswer: 'Сервер не отвечает – попробуй ещё раз',
   noConnection: 'Нет связи с сервером',
   kicked: 'Хозяин удалил тебя из комнаты.',
+  gameGone: 'Не получилось вернуться в прошлую игру – комнаты больше нет или остальные играют без тебя.',
   close: 'Закрыть',
+  privacy: 'Конфиденциальность',
+  sourceCode: 'Исходный код на GitHub',
 
   settings: 'Настройки',
   language: 'Язык',
@@ -353,6 +373,10 @@ const ru: Record<Key, string> = {
   unlimited: 'Без лимита',
   attackMax6: 'до 6 карт',
   attackUnlimited: 'без лимита в 6 карт',
+  hints: 'Подсказки',
+  hintsOn: 'Вкл',
+  hintsOff: 'Выкл',
+  hintsNote: 'с подсказками',
   startGame: 'Начать игру',
   waitingForPlayers: 'Ждём игроков …',
   hostStarts: 'Игру начинает хозяин.',
@@ -463,13 +487,10 @@ export function setLang(next: Lang): void {
 
 /** In der obersten Komponente aufrufen – dann zeichnet sich bei einem Wechsel alles neu. */
 export const useLang = () =>
-  useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
-    },
-    getLang,
-  );
+  useSyncExternalStore((fn) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }, getLang);
 
 /** Text in der aktuellen Sprache, Platzhalter {x} werden ersetzt. */
 export function t(key: Key, params: Record<string, string | number> = {}): string {

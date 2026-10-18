@@ -4,6 +4,7 @@ import { call, saveSession, socket } from './socket';
 import { CardFace } from './CardView';
 import { Avatar } from './Avatar';
 import { Segmented } from './Segmented';
+import { FooterLinks } from './Privacy';
 import { t } from './i18n';
 
 const NAME_KEY = 'durak.name';
@@ -84,8 +85,7 @@ export function Home({ message = '' }: { message?: string }) {
     run((ack) => socket.emit('room:create', { name, color, public: isPublic }, ack));
   };
 
-  const joinOpen = (roomCode: string) =>
-    run((ack) => socket.emit('room:join', { roomCode, name, color }, ack));
+  const joinOpen = (roomCode: string) => run((ack) => socket.emit('room:join', { roomCode, name, color }, ack));
 
   const join = (e: FormEvent) => {
     e.preventDefault();
@@ -106,99 +106,104 @@ export function Home({ message = '' }: { message?: string }) {
       </div>
 
       <div className="home-main">
-      <div className="panel">
-        <div className="me-editor">
-          <div className="me-preview">
-            <Avatar color={color} expression={name.trim() ? 'happy' : 'neutral'} seed="preview" />
+        <div className="panel">
+          <div className="me-editor">
+            <div className="me-preview">
+              <Avatar color={color} expression={name.trim() ? 'happy' : 'neutral'} seed="preview" />
+            </div>
+            <label className="field">
+              <span>{t('yourName')}</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoFocus />
+            </label>
           </div>
-          <label className="field">
-            <span>{t('yourName')}</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoFocus />
-          </label>
-        </div>
-        <div className="swatches" role="radiogroup" aria-label={t('avatarColor')}>
-          {AVATAR_COLORS.map((c, i) => (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={i === color}
-              aria-label={t('colorN', { n: i + 1 })}
-              className={`swatch${i === color ? ' active' : ''}`}
-              style={{ background: c }}
-              onClick={() => setColor(i)}
-            />
-          ))}
-        </div>
-
-        <div className="panel-actions">
-          <Segmented
-            label={t('newRoom')}
-            value={isPublic}
-            options={[
-              { value: false, label: t('private') },
-              { value: true, label: t('public') },
-            ]}
-            onChange={setIsPublic}
-          />
-          <form onSubmit={create}>
-            <button type="submit" className={`btn wide${invited ? ' ghost' : ''}`} disabled={busy || !name.trim()}>
-              {t('createRoom')}
-            </button>
-          </form>
-          <span className="or">{t('or')}</span>
-          <form onSubmit={join} className="join-form">
-            <input
-              aria-label={t('roomCode')}
-              placeholder="CODE"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={5}
-              className="code-input"
-            />
-            <button type="submit" className={`btn${invited ? '' : ' ghost'}`} disabled={busy || !name.trim() || code.trim().length < 5}>
-              {t('join')}
-            </button>
-          </form>
-        </div>
-        {(error || message) && <p className="form-error">{error || message}</p>}
-      </div>
-
-      <section className="panel open-games" aria-labelledby="open-games-title">
-        <h2 id="open-games-title">{t('openGames')}</h2>
-        {lobbies.length === 0 ? (
-          <p className="open-empty">{t('noOpenGames')}</p>
-        ) : (
-          <ul className="open-list">
-            {lobbies.map((l) => (
-              <li key={l.code}>
-                <span className="avatar small">
-                  <Avatar color={l.color} expression="happy" seed={l.code} />
-                </span>
-                <span className="open-info">
-                  <b>{l.host}</b>
-                  <span>
-                    {t('playersOf', { n: l.players, max: MAX_PLAYERS })}
-                    {l.neighborsOnly ? ` · ${t('neighborsOnlyShort')}` : ''}
-                    {l.unlimited ? ` · ${t('attackUnlimited')}` : ''}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="btn small"
-                  disabled={busy || !name.trim()}
-                  title={name.trim() ? undefined : t('enterNameFirst')}
-                  onClick={() => joinOpen(l.code)}
-                >
-                  {t('play')}
-                </button>
-              </li>
+          <div className="swatches" role="radiogroup" aria-label={t('avatarColor')}>
+            {AVATAR_COLORS.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={i === color}
+                aria-label={t('colorN', { n: i + 1 })}
+                className={`swatch${i === color ? ' active' : ''}`}
+                style={{ background: c }}
+                onClick={() => setColor(i)}
+              />
             ))}
-          </ul>
-        )}
-        {lobbies.length > 0 && !name.trim() && <p className="open-hint">{t('enterNameFirst')}</p>}
-      </section>
+          </div>
+
+          <div className="panel-actions">
+            <Segmented
+              label={t('newRoom')}
+              value={isPublic}
+              options={[
+                { value: false, label: t('private') },
+                { value: true, label: t('public') },
+              ]}
+              onChange={setIsPublic}
+            />
+            <form onSubmit={create}>
+              <button type="submit" className={`btn wide${invited ? ' ghost' : ''}`} disabled={busy || !name.trim()}>
+                {t('createRoom')}
+              </button>
+            </form>
+            <span className="or">{t('or')}</span>
+            <form onSubmit={join} className="join-form">
+              <input
+                aria-label={t('roomCode')}
+                placeholder="CODE"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                maxLength={5}
+                className="code-input"
+              />
+              <button
+                type="submit"
+                className={`btn${invited ? '' : ' ghost'}`}
+                disabled={busy || !name.trim() || code.trim().length < 5}
+              >
+                {t('join')}
+              </button>
+            </form>
+          </div>
+          {(error || message) && <p className="form-error">{error || message}</p>}
+        </div>
+
+        <section className="panel open-games" aria-labelledby="open-games-title">
+          <h2 id="open-games-title">{t('openGames')}</h2>
+          {lobbies.length === 0 ? (
+            <p className="open-empty">{t('noOpenGames')}</p>
+          ) : (
+            <ul className="open-list">
+              {lobbies.map((l) => (
+                <li key={l.code}>
+                  <span className="avatar small">
+                    <Avatar color={l.color} expression="happy" seed={l.code} />
+                  </span>
+                  <span className="open-info">
+                    <b>{l.host}</b>
+                    <span>
+                      {t('playersOf', { n: l.players, max: MAX_PLAYERS })}
+                      {l.neighborsOnly ? ` · ${t('neighborsOnlyShort')}` : ''}
+                      {l.unlimited ? ` · ${t('attackUnlimited')}` : ''}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={busy || !name.trim()}
+                    title={name.trim() ? undefined : t('enterNameFirst')}
+                    onClick={() => joinOpen(l.code)}
+                  >
+                    {t('play')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {lobbies.length > 0 && !name.trim() && <p className="open-hint">{t('enterNameFirst')}</p>}
+        </section>
       </div>
+      <FooterLinks />
     </main>
   );
 }

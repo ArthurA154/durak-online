@@ -34,10 +34,16 @@ export interface AdminApi {
  * Anmeldung per Passwort → signiertes Cookie (HttpOnly, 7 Tage). Ändert man das Passwort,
  * sind alle Anmeldungen ungültig.
  */
-export function createAdmin(opts: { password?: string; secureCookie: boolean; api: AdminApi; ipOf: (req: IncomingMessage) => string }) {
+export function createAdmin(opts: {
+  password?: string;
+  secureCookie: boolean;
+  api: AdminApi;
+  ipOf: (req: IncomingMessage) => string;
+}) {
   const password = opts.password ?? '';
   const enabled = password.length >= MIN_PASSWORD;
-  if (password && !enabled) console.warn(`ADMIN_PASSWORD zu kurz (mind. ${MIN_PASSWORD} Zeichen) – Admin-Seite ist aus`);
+  if (password && !enabled)
+    console.warn(`ADMIN_PASSWORD zu kurz (mind. ${MIN_PASSWORD} Zeichen) – Admin-Seite ist aus`);
 
   const loginLimit = new RateLimiter(5, 60_000);
   setInterval(() => loginLimit.prune(), 60_000).unref();
@@ -52,10 +58,14 @@ export function createAdmin(opts: { password?: string; secureCookie: boolean; ap
     return files.get(name)!;
   };
 
-  const sign = (expires: number) => createHmac('sha256', `durak-admin:${password}`).update(String(expires)).digest('base64url');
+  const sign = (expires: number) =>
+    createHmac('sha256', `durak-admin:${password}`).update(String(expires)).digest('base64url');
 
   const isLoggedIn = (req: IncomingMessage): boolean => {
-    const raw = req.headers.cookie?.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${COOKIE}=`));
+    const raw = req.headers.cookie
+      ?.split(';')
+      .map((c) => c.trim())
+      .find((c) => c.startsWith(`${COOKIE}=`));
     const [exp, sig] = (raw?.slice(COOKIE.length + 1) ?? '').split('.');
     const expires = Number(exp);
     if (!expires || expires < Date.now() || !sig) return false;

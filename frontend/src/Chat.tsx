@@ -91,20 +91,20 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
           {quickOnly ? (
             <p className="chat-note">{t('quickOnly')}</p>
           ) : (
-          <form className="chat-form" onSubmit={submit}>
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={CHAT_MAX}
-              placeholder={t('messagePlaceholder')}
-              aria-label={t('message')}
-              enterKeyHint="send"
-              autoComplete="off"
-            />
-            <button type="submit" className="chat-send" disabled={!text.trim()} aria-label={t('send')}>
-              <SendIcon />
-            </button>
-          </form>
+            <form className="chat-form" onSubmit={submit}>
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={CHAT_MAX}
+                placeholder={t('messagePlaceholder')}
+                aria-label={t('message')}
+                enterKeyHint="send"
+                autoComplete="off"
+              />
+              <button type="submit" className="chat-send" disabled={!text.trim()} aria-label={t('send')}>
+                <SendIcon />
+              </button>
+            </form>
           )}
           {error && (
             <p className="chat-error" role="alert">
@@ -119,7 +119,16 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
 
 function ChatIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
     </svg>
   );

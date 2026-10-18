@@ -127,7 +127,7 @@ export class RoomManager {
       gameStartedAt: null,
       gamePlayers: [],
       chat: [],
-      settings: { public: isPublic, neighborsOnly: false, unlimited: false },
+      settings: { public: isPublic, neighborsOnly: false, unlimited: false, hints: false },
       banned: new Set(),
     };
     this.rooms.set(code, room);
@@ -190,6 +190,7 @@ export class RoomManager {
     if (typeof change?.public === 'boolean') room.settings.public = change.public;
     if (typeof change?.neighborsOnly === 'boolean') room.settings.neighborsOnly = change.neighborsOnly;
     if (typeof change?.unlimited === 'boolean') room.settings.unlimited = change.unlimited;
+    if (typeof change?.hints === 'boolean') room.settings.hints = change.hints;
   }
 
   /** Gastgeber wirft jemanden aus dem Raum (nicht während einer Partie). Gibt dessen Verbindung zurück. */
@@ -306,6 +307,8 @@ export class RoomManager {
     if (isRunning(room)) {
       room.game!.removePlayer(player.id);
       this.recordResult(room);
+      // Nur noch einer übrig → abgebrochen, zurück in die Lobby (dort kann wieder jemand dazukommen)
+      if (room.game!.finished && room.game!.players.length < 2) room.game = null;
     } else {
       // Ergebnisbild einer alten Partie passt nicht mehr zu den Spielern → zurück in die Lobby
       room.game = null;
@@ -395,9 +398,7 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
     }),
     hand: [...handOf(playerId)].sort(
       (a, b) =>
-        Number(a.suit === g?.trump) - Number(b.suit === g?.trump) ||
-        a.rank - b.rank ||
-        a.suit.localeCompare(b.suit),
+        Number(a.suit === g?.trump) - Number(b.suit === g?.trump) || a.rank - b.rank || a.suit.localeCompare(b.suit),
     ),
     trumpSuit: g?.trump ?? null,
     trumpCard: g && g.deck.length > 0 ? g.trumpCard : null,

@@ -19,15 +19,79 @@ interface Theme {
   rimLight: string;
 }
 
-export const THEMES: Theme[] = [
-  { id: 'classic', room: '#131726', roomLight: '#1f2540', felt: '#1d7a6b', feltEdge: '#0d4740', rim: '#3a2316', rimLight: '#6b4329' },
-  { id: 'wood', room: '#1c130d', roomLight: '#2d2018', felt: '#9a6a3f', feltEdge: '#5e3a1f', rim: '#3b2414', rimLight: '#7a5233' },
-  { id: 'pub', room: '#140e0a', roomLight: '#2a1d14', felt: '#5b3a24', feltEdge: '#2e1c10', rim: '#24150c', rimLight: '#55361f' },
-  { id: 'space', room: '#05060f', roomLight: '#161a33', felt: '#1a2147', feltEdge: '#0a0d22', rim: '#0f1430', rimLight: '#4de1ff' },
-  { id: 'train', room: '#17211f', roomLight: '#26332f', felt: '#c9c2b0', feltEdge: '#a69f8c', rim: '#6d727a', rimLight: '#c5cad1' },
-  { id: 'kitchen', room: '#1d1b12', roomLight: '#2e2b1d', felt: '#efe6d2', feltEdge: '#d9cdb3', rim: '#8a2f2a', rimLight: '#c2524a' },
-  { id: 'beach', room: '#1a1430', roomLight: '#2b2348', felt: '#2f8f9d', feltEdge: '#1d5f69', rim: '#b8935a', rimLight: '#e3c48a' },
-  { id: 'casino', room: '#16070b', roomLight: '#2c1016', felt: '#8e1b26', feltEdge: '#4a0b12', rim: '#5c4313', rimLight: '#e3bd5b' },
+const THEMES: Theme[] = [
+  {
+    id: 'classic',
+    room: '#131726',
+    roomLight: '#1f2540',
+    felt: '#1d7a6b',
+    feltEdge: '#0d4740',
+    rim: '#3a2316',
+    rimLight: '#6b4329',
+  },
+  {
+    id: 'wood',
+    room: '#1c130d',
+    roomLight: '#2d2018',
+    felt: '#9a6a3f',
+    feltEdge: '#5e3a1f',
+    rim: '#3b2414',
+    rimLight: '#7a5233',
+  },
+  {
+    id: 'pub',
+    room: '#140e0a',
+    roomLight: '#2a1d14',
+    felt: '#5b3a24',
+    feltEdge: '#2e1c10',
+    rim: '#24150c',
+    rimLight: '#55361f',
+  },
+  {
+    id: 'space',
+    room: '#05060f',
+    roomLight: '#161a33',
+    felt: '#1a2147',
+    feltEdge: '#0a0d22',
+    rim: '#0f1430',
+    rimLight: '#4de1ff',
+  },
+  {
+    id: 'train',
+    room: '#17211f',
+    roomLight: '#26332f',
+    felt: '#c9c2b0',
+    feltEdge: '#a69f8c',
+    rim: '#6d727a',
+    rimLight: '#c5cad1',
+  },
+  {
+    id: 'kitchen',
+    room: '#1d1b12',
+    roomLight: '#2e2b1d',
+    felt: '#efe6d2',
+    feltEdge: '#d9cdb3',
+    rim: '#8a2f2a',
+    rimLight: '#c2524a',
+  },
+  {
+    id: 'beach',
+    room: '#1a1430',
+    roomLight: '#2b2348',
+    felt: '#2f8f9d',
+    feltEdge: '#1d5f69',
+    rim: '#b8935a',
+    rimLight: '#e3c48a',
+  },
+  {
+    id: 'casino',
+    room: '#16070b',
+    roomLight: '#2c1016',
+    felt: '#8e1b26',
+    feltEdge: '#4a0b12',
+    rim: '#5c4313',
+    rimLight: '#e3bd5b',
+  },
 ];
 
 const KEY = 'durak.theme';
@@ -73,41 +137,41 @@ function apply(id: ThemeId): void {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', th.room);
 }
 
-export const useTheme = () => useSyncExternalStore(subscribe, get);
+const useTheme = () => useSyncExternalStore(subscribe, get);
 
 // ---------- Auswahl ----------
 
 export function ThemeGrid() {
   const theme = useTheme();
   return (
-      <div className="theme-grid" role="radiogroup" aria-label={t('background')}>
-        {THEMES.map((th) => (
-          <button
-            key={th.id}
-            type="button"
-            role="radio"
-            aria-checked={th.id === theme}
-            className={`theme-tile${th.id === theme ? ' on' : ''}`}
-            onClick={() => setTheme(th.id)}
+    <div className="theme-grid" role="radiogroup" aria-label={t('background')}>
+      {THEMES.map((th) => (
+        <button
+          key={th.id}
+          type="button"
+          role="radio"
+          aria-checked={th.id === theme}
+          className={`theme-tile${th.id === theme ? ' on' : ''}`}
+          onClick={() => setTheme(th.id)}
+        >
+          <span
+            className="theme-preview"
+            data-preview={th.id}
+            style={
+              {
+                '--p-room': th.room,
+                '--p-felt': th.felt,
+                '--p-edge': th.feltEdge,
+                '--p-rim': th.rimLight,
+              } as CSSProperties
+            }
           >
-            <span
-              className="theme-preview"
-              data-preview={th.id}
-              style={
-                {
-                  '--p-room': th.room,
-                  '--p-felt': th.felt,
-                  '--p-edge': th.feltEdge,
-                  '--p-rim': th.rimLight,
-                } as CSSProperties
-              }
-            >
-              <i />
-            </span>
-            <span className="theme-name">{t(`theme.${th.id}` as Key)}</span>
-          </button>
-        ))}
-      </div>
+            <i />
+          </span>
+          <span className="theme-name">{t(`theme.${th.id}` as Key)}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -164,11 +228,28 @@ function Space() {
       <ellipse cx="1350" cy="780" rx="560" ry="320" fill="url(#neb2)" />
       <ellipse cx="1150" cy="180" rx="380" ry="200" fill="url(#neb1)" opacity="0.5" />
       {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.s} fill="#fff" className={s.t > 0.82 ? 'twinkle' : undefined} style={{ animationDelay: `${s.t * 4}s` }} opacity={0.4 + s.t * 0.6} />
+        <circle
+          key={i}
+          cx={s.x}
+          cy={s.y}
+          r={s.s}
+          fill="#fff"
+          className={s.t > 0.82 ? 'twinkle' : undefined}
+          style={{ animationDelay: `${s.t * 4}s` }}
+          opacity={0.4 + s.t * 0.6}
+        />
       ))}
       <g transform="translate(1420 170)">
         <circle r="70" fill="url(#planet)" />
-        <ellipse rx="120" ry="22" fill="none" stroke="#f3d3a1" strokeOpacity="0.55" strokeWidth="6" transform="rotate(-18)" />
+        <ellipse
+          rx="120"
+          ry="22"
+          fill="none"
+          stroke="#f3d3a1"
+          strokeOpacity="0.55"
+          strokeWidth="6"
+          transform="rotate(-18)"
+        />
       </g>
     </svg>
   );
@@ -184,7 +265,12 @@ function Pub() {
       const x = 40 + i * 72 + r() * 20;
       return { x, y: y - h, w, h, c: colors[Math.floor(r() * colors.length)] };
     });
-  const bokeh = Array.from({ length: 26 }, () => ({ x: r() * 1600, y: r() * 1000, rr: 20 + r() * 60, o: 0.06 + r() * 0.14 }));
+  const bokeh = Array.from({ length: 26 }, () => ({
+    x: r() * 1600,
+    y: r() * 1000,
+    rr: 20 + r() * 60,
+    o: 0.06 + r() * 0.14,
+  }));
   return (
     <svg {...SCENE}>
       <defs>
@@ -333,7 +419,14 @@ function Beach() {
       <circle cx="800" cy="560" r="120" fill="#ffb36b" opacity="0.85" />
       <rect y="560" width="1600" height="260" fill="url(#sea)" />
       {Array.from({ length: 7 }, (_, i) => (
-        <path key={i} d={`M${120 + i * 210} ${610 + (i % 3) * 50} q30 -12 60 0 t60 0`} stroke="#ffb36b" strokeOpacity="0.35" strokeWidth="4" fill="none" />
+        <path
+          key={i}
+          d={`M${120 + i * 210} ${610 + (i % 3) * 50} q30 -12 60 0 t60 0`}
+          stroke="#ffb36b"
+          strokeOpacity="0.35"
+          strokeWidth="4"
+          fill="none"
+        />
       ))}
       <path d="M0 820 Q400 780 800 810 T1600 800 V1000 H0Z" fill="#3a2c2a" />
       {/* Palme */}

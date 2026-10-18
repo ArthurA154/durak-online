@@ -242,7 +242,10 @@ function playEighth(s: number, t: number): void {
   // sparsame Melodie, jede 4. Runde Pause
   const resting = Math.floor(bar / CHORDS.length) % 4 === 0;
   if (!resting && pos % 2 === 0 && Math.random() < 0.28) {
-    melodyIdx = Math.max(0, Math.min(MELODY.length - 1, melodyIdx + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
+    melodyIdx = Math.max(
+      0,
+      Math.min(MELODY.length - 1, melodyIdx + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]),
+    );
     epiano(musicBus, mtof(MELODY[melodyIdx]), t, 1.2, 0.05);
   }
 }
@@ -277,8 +280,7 @@ export const sfx = {
       }
     }),
   /** Jemand ist raus */
-  out: () =>
-    play((t) => [72, 76, 79, 84].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.07, 1.2, 0.11))),
+  out: () => play((t) => [72, 76, 79, 84].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.07, 1.2, 0.11))),
   deal: () =>
     play((t) => {
       for (let i = 0; i < 6; i++) snap(t + i * 0.09, 0.3);
@@ -294,8 +296,7 @@ export const sfx = {
       sine(sfxBus, 120, t + 0.25, 0.25, 0.35, 60);
     }),
   bito: () => play((t) => burst(sfxBus, t, 0.4, 0.35, 'bandpass', 600, 5000)),
-  win: () =>
-    play((t) => [57, 64, 67, 71, 76].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.09, 1.6, 0.12))),
+  win: () => play((t) => [57, 64, 67, 71, 76].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.09, 1.6, 0.12))),
   /** Karte vom Stapel ziehen: kurzes Wischen */
   draw: () =>
     play((t) => {

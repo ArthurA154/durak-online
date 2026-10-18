@@ -217,9 +217,7 @@ io.on('connection', (socket: IoSocket) => {
   socket.on('lobbies:unwatch', () => void socket.leave(LOBBY_WATCHERS));
 
   socket.on('game:start', (ack) => inRoom(socket, ack, (room, id) => rooms.start(room, id)));
-  socket.on('game:attack', ({ card }, ack) =>
-    inRoom(socket, ack, (room, id) => requireGame(room).attack(id, card)),
-  );
+  socket.on('game:attack', ({ card }, ack) => inRoom(socket, ack, (room, id) => requireGame(room).attack(id, card)));
   socket.on('game:defend', ({ attackIndex, card }, ack) =>
     inRoom(socket, ack, (room, id) => requireGame(room).defend(id, attackIndex, card)),
   );

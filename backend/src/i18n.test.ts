@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { SERVER_ERRORS, translateServer } from '@durak/shared';
 
 // Jede feste Meldung, die der Server verschicken kann, muss übersetzt sein.
-const SOURCES = ['game/durak.ts', 'rooms.ts', 'server.ts'].map((f) => readFileSync(new URL(f, import.meta.url), 'utf8'));
+const SOURCES = ['game/durak.ts', 'rooms.ts', 'server.ts'].map((f) =>
+  readFileSync(new URL(f, import.meta.url), 'utf8'),
+);
 
 function fixedMessages(): string[] {
   const found = new Set<string>();

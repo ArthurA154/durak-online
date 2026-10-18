@@ -35,7 +35,13 @@ describe('Stats', () => {
     s.gameEnded(rec('durak'));
     s.gameEnded(rec('draw'));
     s.gameEnded(rec('aborted'));
-    expect(s.lastDays(1)[0]).toMatchObject({ gamesStarted: 1, gamesFinished: 2, draws: 1, aborted: 1, playMs: 120_000 });
+    expect(s.lastDays(1)[0]).toMatchObject({
+      gamesStarted: 1,
+      gamesFinished: 2,
+      draws: 1,
+      aborted: 1,
+      playMs: 120_000,
+    });
     expect(s.recentGames().map((g) => g.outcome)).toEqual(['aborted', 'draw', 'durak']);
   });
 

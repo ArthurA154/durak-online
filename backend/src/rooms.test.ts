@@ -81,14 +81,15 @@ describe('Zug-Timer im Raum', () => {
     expect(g.table).toEqual([]);
   });
 
-  it('alles geschlagen: auch nur 4 Sekunden, dann Bito', () => {
+  it('alles geschlagen: normaler Zug-Timer, kein Countdown', () => {
     const { rooms, room, g, c, ben } = bout();
     g.defend(ben, 0, c(9, 'S'));
     rooms.armTimer(room, () => {});
-    expect(viewFor(room, ben).timer?.kind).toBe('throwIn');
+    expect(viewFor(room, ben).timer).toMatchObject({ kind: 'turn', totalMs: TURN_MS });
     vi.advanceTimersByTime(THROW_IN_MS);
+    expect(g.table).toHaveLength(1);
+    vi.advanceTimersByTime(TURN_MS - THROW_IN_MS);
     expect(g.table).toEqual([]);
-    expect(g.discardCount).toBe(2);
   });
 
   it('Raum verlassen in der Lobby / Aufräumen stoppt den Timer', () => {
@@ -160,13 +161,13 @@ describe('Zug-Timer im Raum', () => {
     expect(() => rooms.rejoin(room.code, ben.token, 's9')).toThrow('Sitzung abgelaufen');
   });
 
-  it('bleibt nur einer übrig, endet die Partie unentschieden', () => {
+  it('bleibt nur einer übrig, ist die Partie abgebrochen und er wartet in der Lobby', () => {
     const { rooms, room } = startedRoom();
     rooms.disconnect(room, 's2');
     vi.advanceTimersByTime(AWAY_KICK_MS);
     rooms.kick(room, room.players[0].id, room.players[1].id);
-    expect(room.game!.finished).toBe(true);
-    expect(room.game!.durakId).toBeNull();
+    expect(room.game).toBeNull();
+    expect(room.players).toHaveLength(1);
   });
 
   it('alte/doppelte Verbindung kann den Spieler nicht abmelden', () => {
@@ -196,7 +197,6 @@ describe('Zug-Timer im Raum', () => {
     expect(lobby.players.map((p) => p.name)).toEqual(['Dima']);
   });
 });
-
 
 describe('Chat und Werfen', () => {
   function room2() {
@@ -241,7 +241,9 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const rooms = new RoomManager();
     const pub = rooms.create('Anna', 0, 's1', true).room;
     rooms.create('Privat', 1, 's2');
-    expect(rooms.openLobbies()).toEqual([{ code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false }]);
+    expect(rooms.openLobbies()).toEqual([
+      { code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false },
+    ]);
     const b = rooms.join(pub.code, 'Ben', 1, 's3').session;
     rooms.start(pub, pub.hostId);
     expect(rooms.openLobbies()).toEqual([]); // läuft → nicht mehr sichtbar
@@ -253,8 +255,9 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const { room, session } = rooms.create('Anna', 0, 's1');
     const b = rooms.join(room.code, 'Ben', 1, 's2').session;
     expect(() => rooms.updateSettings(room, b.playerId, { public: true })).toThrow('Nur der Gastgeber');
-    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true, unlimited: true });
-    expect(room.settings).toEqual({ public: true, neighborsOnly: true, unlimited: true });
+    expect(room.settings.hints).toBe(false); // Standard: selbst aufpassen
+    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true, unlimited: true, hints: true });
+    expect(room.settings).toEqual({ public: true, neighborsOnly: true, unlimited: true, hints: true });
     rooms.start(room, session.playerId);
     expect(room.game!.neighborsOnly).toBe(true);
     expect(room.game!.maxTable).toBe(Infinity);
@@ -284,5 +287,19 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const { room, session } = rooms.create('Anna', 0, 's1', true);
     expect(rooms.chat(room, session.playerId, 'GG').text).toBe('GG');
     expect(() => rooms.chat(room, session.playerId, 'hallo')).toThrow('Schnellsprüche');
+  });
+});
+
+describe('Alle anderen sind weg', () => {
+  it('der Letzte landet wieder in der Lobby, andere können beitreten', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const b = rooms.join(room.code, 'Ben', 1, 's2').session;
+    rooms.start(room, session.playerId);
+    rooms.leave(room, session.playerId, 's1');
+    expect(room.game).toBeNull();
+    expect(viewFor(room, b.playerId).phase).toBe('lobby');
+    expect(room.hostId).toBe(b.playerId);
+    expect(rooms.join(room.code, 'Anna', 0, 's3').room).toBe(room);
   });
 });

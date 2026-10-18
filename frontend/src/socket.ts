@@ -9,19 +9,35 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(API
   autoConnect: true,
 });
 
+/** So lange gilt eine gemerkte Sitzung nach dem Schließen des Browsers */
+const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+// Die Sitzung liegt im Tab (sessionStorage) UND auf dem Gerät (localStorage):
+// sessionStorage ist nach dem Schließen von Tab/Browser weg – dann hilft localStorage weiter.
 export function loadSession(): Session | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    const tab = sessionStorage.getItem(SESSION_KEY);
+    if (tab) return JSON.parse(tab) as Session;
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as (Session & { at: number }) | null;
+    if (saved && Date.now() - saved.at < SESSION_MAX_AGE_MS) {
+      const { at: _at, ...session } = saved;
+      return session;
+    }
   } catch {
-    return null;
+    // kaputt oder kein Speicher → neu anfangen
   }
+  return null;
 }
 
 export function saveSession(s: Session | null): void {
   try {
-    if (s) sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
-    else sessionStorage.removeItem(SESSION_KEY);
+    if (s) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ ...s, at: Date.now() }));
+    } else {
+      sessionStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
+    }
   } catch {
     // z. B. privater Modus – dann eben ohne Wiederverbinden
   }
@@ -33,9 +49,7 @@ const CALL_TIMEOUT_MS = 8000;
 export function call<T>(send: (ack: (r: Result<T>) => void) => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
-      reject(
-        new Error(socket.connected ? t('noAnswer') : t('noConnection')),
-      );
+      reject(new Error(socket.connected ? t('noAnswer') : t('noConnection')));
     }, CALL_TIMEOUT_MS);
     send((r) => {
       window.clearTimeout(timer);

@@ -9,7 +9,7 @@ import { t } from './i18n';
 // Liegt als eigene Ebene über allem und sucht die Figuren über [data-seat="<id>"] .avatar –
 // so müssen Lobby und Tisch nichts davon wissen.
 
-export const ITEMS: { item: ThrowItem; emoji: string }[] = [
+const ITEMS: { item: ThrowItem; emoji: string }[] = [
   { item: 'tomato', emoji: '🍅' },
   { item: 'egg', emoji: '🥚' },
   { item: 'slipper', emoji: '🥿' },
@@ -103,7 +103,9 @@ export function FxLayer({ me }: { me: string }) {
           const p = i / 12;
           const x = (tx - sx) * p;
           const y = (ty - sy) * p - lift * 4 * p * (1 - p);
-          return { transform: `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${spin * p}deg) scale(${1 + 0.4 * Math.sin(Math.PI * p)})` };
+          return {
+            transform: `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${spin * p}deg) scale(${1 + 0.4 * Math.sin(Math.PI * p)})`,
+          };
         });
         sfx.whoosh();
         const anim = el.animate(frames, { duration: FLY_MS, easing: 'linear' });

@@ -59,7 +59,7 @@ const dayFormat = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-export const dayOf = (t: number): string => dayFormat.format(t);
+const dayOf = (t: number): string => dayFormat.format(t);
 
 const emptyDay = (date: string): DayStats => ({
   date,
@@ -105,7 +105,10 @@ export class Stats {
     const day = this.today();
     day.connections++;
     this.rollVisitors(day.date);
-    const hash = createHash('sha256').update(this.visitorSalt + ip).digest('base64url').slice(0, 16);
+    const hash = createHash('sha256')
+      .update(this.visitorSalt + ip)
+      .digest('base64url')
+      .slice(0, 16);
     if (!this.visitors.has(hash)) {
       this.visitors.add(hash);
       day.visitors = this.visitors.size;

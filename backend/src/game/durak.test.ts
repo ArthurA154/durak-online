@@ -105,8 +105,7 @@ describe('Angreifen und Schlagen', () => {
 });
 
 describe('Weiterschieben (Perevodnoy)', () => {
-  const setup = () =>
-    new DurakGame(['a', 'b', 'c'], rigDeck([handA, handB, handC], c(14, 'C')));
+  const setup = () => new DurakGame(['a', 'b', 'c'], rigDeck([handA, handB, handC], c(14, 'C')));
 
   it('schiebt mit gleichem Wert an den nächsten Spieler weiter', () => {
     const g = setup();
@@ -262,8 +261,7 @@ describe('Spielende', () => {
       const g = new DurakGame(['a', 'b', 'c', 'd'].slice(0, 2 + (seed % 3)));
       playRandomly(g);
       expect(g.finished).toBe(true);
-      const total =
-        g.discardCount + g.deck.length + g.players.reduce((s, p) => s + p.hand.length, 0);
+      const total = g.discardCount + g.deck.length + g.players.reduce((s, p) => s + p.hand.length, 0);
       expect(total).toBe(36);
     }
   });
@@ -385,7 +383,6 @@ describe('Spieler verlässt die Partie', () => {
   });
 });
 
-
 describe('Nachlegen nur für Nachbarn', () => {
   function fourPlayers(neighborsOnly: boolean) {
     const g = new DurakGame(['a', 'b', 'c', 'd'], shuffle(createDeck()), { neighborsOnly });
@@ -443,7 +440,18 @@ describe('Angriff ohne 6er-Grenze', () => {
     g.defenderIdx = 1;
     // a hat Siebener und Neuner, b hat 10 Karten
     g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')];
-    g.players[1].hand = [c(9, 'S'), c(10, 'S'), c(10, 'H'), c(10, 'D'), c(10, 'C'), c(11, 'S'), c(11, 'H'), c(11, 'D'), c(11, 'C'), c(12, 'S')];
+    g.players[1].hand = [
+      c(9, 'S'),
+      c(10, 'S'),
+      c(10, 'H'),
+      c(10, 'D'),
+      c(10, 'C'),
+      c(11, 'S'),
+      c(11, 'H'),
+      c(11, 'D'),
+      c(11, 'C'),
+      c(12, 'S'),
+    ];
     g.attack('a', c(7, 'S'));
     g.defend('b', 0, c(9, 'S')); // jetzt liegen 7 und 9 → beide Werte erlaubt
     for (const card of [c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')]) g.attack('a', card);
@@ -455,7 +463,18 @@ describe('Angriff ohne 6er-Grenze', () => {
     g.attackerIdx = 0;
     g.defenderIdx = 1;
     g.players[0].hand = [c(7, 'S'), c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D'), c(9, 'C')];
-    g.players[1].hand = [c(9, 'S'), c(10, 'S'), c(10, 'H'), c(10, 'D'), c(10, 'C'), c(11, 'S'), c(11, 'H'), c(11, 'D'), c(11, 'C'), c(12, 'S')];
+    g.players[1].hand = [
+      c(9, 'S'),
+      c(10, 'S'),
+      c(10, 'H'),
+      c(10, 'D'),
+      c(10, 'C'),
+      c(11, 'S'),
+      c(11, 'H'),
+      c(11, 'D'),
+      c(11, 'C'),
+      c(12, 'S'),
+    ];
     g.attack('a', c(7, 'S'));
     g.defend('b', 0, c(9, 'S'));
     for (const card of [c(7, 'H'), c(7, 'D'), c(7, 'C'), c(9, 'H'), c(9, 'D')]) g.attack('a', card);

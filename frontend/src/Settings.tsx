@@ -1,9 +1,10 @@
 import { LANGS } from '@durak/shared';
 import { Popover } from './Popover';
-import { VolumeSliders } from './AudioToggles';
+import { VolumeSliders } from './Volume';
 import { ThemeGrid } from './Theme';
 import { LANG_NAMES, getLang, setLang, t } from './i18n';
 import { Segmented } from './Segmented';
+import { FooterLinks } from './Privacy';
 
 const GearIcon = () => (
   <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
@@ -37,6 +38,7 @@ export function Settings() {
         <h3>{t('background')}</h3>
         <ThemeGrid />
       </section>
+      <FooterLinks />
     </Popover>
   );
 }

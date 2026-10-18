@@ -12,6 +12,11 @@
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w backend && npm run build -w frontend",
     "test": "npm test -w backend",
-    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend"
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend",
+    "format": "prettier --write \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.{ts,js,css,html}\" \"shared/src/**/*.ts\"",
+    "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx,css}\" \"backend/src/**/*.{ts,js,css,html}\" \"shared/src/**/*.ts\""
+  },
+  "devDependencies": {
+    "prettier": "3.3.3"
   }
 }

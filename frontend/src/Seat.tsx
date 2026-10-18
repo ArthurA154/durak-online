@@ -55,11 +55,7 @@ export function Seat(props: Props) {
       {fan > 0 && !out && (
         <div className="seat-fan" aria-hidden="true">
           {Array.from({ length: fan }, (_, i) => (
-            <CardBack
-              key={i}
-              mini
-              style={{ '--r': `${(i - (fan - 1) / 2) * 8}deg`, '--k': i } as CSSProperties}
-            />
+            <CardBack key={i} mini style={{ '--r': `${(i - (fan - 1) / 2) * 8}deg`, '--k': i } as CSSProperties} />
           ))}
         </div>
       )}

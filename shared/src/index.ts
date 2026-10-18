@@ -23,7 +23,7 @@ export const MAX_PLAYERS = 4;
 export const TURN_SILENT_MS = 15_000;
 export const TURN_WARN_MS = 10_000;
 export const TURN_MS = TURN_SILENT_MS + TURN_WARN_MS;
-/** Nach „Schlucken“ oder „Alles geschlagen“: so lange dürfen die anderen noch nachlegen */
+/** Nach „Schlucken“: so lange dürfen die anderen noch nachlegen */
 export const THROW_IN_MS = 4_000;
 
 /** Wer so lange getrennt ist, darf von den anderen aus dem Raum entfernt werden (bzw. fliegt aus der Lobby). */
@@ -72,6 +72,8 @@ export interface RoomSettings {
   neighborsOnly: boolean;
   /** Angriff ohne 6er-Grenze – so viele Karten, wie der Verteidiger hat */
   unlimited: boolean;
+  /** Spielhilfen: passende Karten leuchten (Standard aus – selbst aufpassen) */
+  hints: boolean;
 }
 
 /** Eintrag in der Liste offener Spiele auf der Startseite */

@@ -1,8 +1,7 @@
 import type { GameView } from '@durak/shared';
 import { t } from './i18n';
 
-export const nameOf = (view: GameView, id: string | null) =>
-  view.players.find((p) => p.id === id)?.name ?? '?';
+const nameOf = (view: GameView, id: string | null) => view.players.find((p) => p.id === id)?.name ?? '?';
 
 /** Wer ist gerade dran und was ist zu tun? `mine` = ich muss etwas machen. */
 export function turnInfo(view: GameView): { text: string; mine: boolean } {
@@ -17,7 +16,10 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
   if (view.table.length === 0) {
     return view.attackerId === me
       ? { text: t('turnYouAttack'), mine: true }
-      : { text: t(isDefender ? 'turnNameAttacksYouNext' : 'turnNameAttacks', { name: name(view.attackerId) }), mine: false };
+      : {
+          text: t(isDefender ? 'turnNameAttacksYouNext' : 'turnNameAttacks', { name: name(view.attackerId) }),
+          mine: false,
+        };
   }
   // „Nur Nachbarn“: wer gegenüber sitzt, schaut bei dieser Runde nur zu
   const sidelined = !isDefender && !view.throwers.includes(me);
