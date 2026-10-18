@@ -29,7 +29,8 @@ export function useGameSounds(view: GameView | null): void {
       if (view.discardCount > p.discardCount) sfx.bito();
       else sfx.take();
     }
-    if (!turnInfo(p).mine && turnInfo(view).mine) sfx.turn();
+    if (!p.taking && view.taking) sfx.gulp();
+    else if (!turnInfo(p).mine && turnInfo(view).mine) sfx.turn();
     if (view.players.some((x) => x.out && !p.players.find((y) => y.id === x.id)?.out)) sfx.out();
   }, [view]);
 }

@@ -290,6 +290,9 @@ export function Table({ view }: { view: GameView }) {
     return r ? centerOf(r) : null;
   };
 
+  // Schlucken soll man sofort sehen: Stempel auf dem Tisch, roter Ring am Platz
+  const taking = view.taking && !finished && !dealing;
+  const defenderName = view.players.find((p) => p.id === view.defenderId)?.name ?? '';
   const opponents = rotateFrom(view.players, me).filter((p) => p.id !== me);
   const positions = opponentPositions(opponents.length);
   const n = view.hand.length;
@@ -416,6 +419,22 @@ export function Table({ view }: { view: GameView }) {
             )}
           </AnimatePresence>
 
+          <AnimatePresence>
+            {taking && (
+              <motion.div
+                key={`take-${view.defenderId}`}
+                className="take-stamp"
+                aria-live="polite"
+                initial={{ scale: 2.6, opacity: 0, rotate: -18 }}
+                animate={{ scale: [2.6, 1, 1, 0.85], opacity: [0, 1, 1, 0.6], rotate: -8 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 2.4, times: [0, 0.15, 0.75, 1] }}
+              >
+                {isDefender ? t('stampYouTake') : t('stampNameTakes', { name: defenderName })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>{view.paused && !finished && <PauseOverlay view={view} />}</AnimatePresence>
 
           <AnimatePresence>
@@ -455,6 +474,7 @@ export function Table({ view }: { view: GameView }) {
             expression={expressionFor(view, p.id)}
             hat={p.id === view.lastDurakId}
             role={p.id === view.attackerId ? 'attacker' : p.id === view.defenderId ? 'defender' : null}
+            taking={taking && p.id === view.defenderId}
             done={view.passed.includes(p.id)}
             offline={!p.connected}
             out={p.out}
@@ -482,7 +502,7 @@ export function Table({ view }: { view: GameView }) {
       <section className={`me${turn.mine ? ' my-turn' : ''}`}>
         <div className="me-bar">
           <div
-            className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}`}
+            className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}${taking && isDefender ? ' is-taking' : ''}`}
             data-seat={me}
           >
             <span className="avatar small">

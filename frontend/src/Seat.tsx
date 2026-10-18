@@ -23,6 +23,8 @@ interface Props {
   /** Leerer Stuhl (Lobby) */
   empty?: boolean;
   role?: 'attacker' | 'defender' | null;
+  /** Schluckt gerade – deutlich markiert */
+  taking?: boolean;
   done?: boolean;
   offline?: boolean;
   out?: boolean;
@@ -37,11 +39,12 @@ interface Props {
 /** Ein Platz am Tisch mit Figur, Name, Kartenfächer und Status. */
 export function Seat(props: Props) {
   const { pos, id, name = '', color = 0, expression, hat, empty, role, done, offline, out } = props;
-  const { cardCount, note, countdown } = props;
+  const { cardCount, note, countdown, taking } = props;
   const classes = [
     'seat',
     `pos-${pos}`,
     role && `is-${role}`,
+    taking && 'is-taking',
     offline && 'is-offline',
     out && 'is-out',
     empty && 'is-empty',

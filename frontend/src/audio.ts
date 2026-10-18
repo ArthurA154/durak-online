@@ -290,6 +290,12 @@ export const sfx = {
       epiano(sfxBus, mtof(76), t, 0.8, 0.12);
       epiano(sfxBus, mtof(81), t + 0.11, 1, 0.12);
     }),
+  /** Jemand schluckt: absteigendes „wom-wom“ */
+  gulp: () =>
+    play((t) => {
+      sine(sfxBus, 330, t, 0.22, 0.28, 220);
+      sine(sfxBus, 250, t + 0.24, 0.5, 0.28, 110);
+    }),
   take: () =>
     play((t) => {
       burst(sfxBus, t, 0.35, 0.3, 'bandpass', 2500, 300);
