@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { GameView, Session } from '@durak/shared';
-import { call, loadSession, saveSession, socket } from './socket';
+import { call, connectErrorText, loadSession, saveSession, socket } from './socket';
 import { Home } from './Home';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
@@ -14,6 +14,8 @@ export function App() {
   const [view, setView] = useState<GameView | null>(null);
   const [connected, setConnected] = useState(socket.connected);
   const [connectError, setConnectError] = useState('');
+  // „Verbinde …“ erst zeigen, wenn es länger dauert (sonst flackert es bei jedem Laden)
+  const [slow, setSlow] = useState(false);
 
   useEffect(() => {
     const onConnect = () => {
@@ -30,13 +32,15 @@ export function App() {
       }
     };
     const onDisconnect = () => setConnected(false);
-    const onConnectError = (err: Error) => setConnectError(err.message);
+    const onConnectError = (err: Error) => setConnectError(connectErrorText(err));
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
     socket.on('state', setView);
     if (socket.connected) onConnect();
+    const slowTimer = window.setTimeout(() => setSlow(true), 2500);
     return () => {
+      window.clearTimeout(slowTimer);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
@@ -61,7 +65,6 @@ export function App() {
       <header className="topbar">
         {view ? <span className="wordmark">Дурак</span> : <span />}
         <div className="topbar-right">
-          {!connected && <span className="offline-note">{connectError || 'Verbinde mit dem Server …'}</span>}
           <AudioToggles />
           {view && (
             <button type="button" className="btn ghost small" onClick={leave}>
@@ -70,6 +73,11 @@ export function App() {
           )}
         </div>
       </header>
+      {!connected && (connectError || slow) && (
+        <div className="conn-banner" role="alert">
+          {connectError || 'Verbinde mit dem Server …'}
+        </div>
+      )}
       {!view && <Home />}
       {view?.phase === 'lobby' && <Lobby view={view} />}
       {inGame && <Table view={view} />}

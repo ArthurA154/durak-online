@@ -26,9 +26,27 @@ export function saveSession(s: Session | null): void {
   }
 }
 
-/** Wandelt einen ack-Callback in ein Promise um und wirft bei Fehlern. */
+const CALL_TIMEOUT_MS = 8000;
+
+/** Wandelt einen ack-Callback in ein Promise um und wirft bei Fehlern – oder wenn keine Antwort kommt. */
 export function call<T>(send: (ack: (r: Result<T>) => void) => void): Promise<T> {
   return new Promise((resolve, reject) => {
-    send((r) => (r.ok ? resolve(r as T) : reject(new Error(r.error))));
+    const timer = window.setTimeout(() => {
+      reject(
+        new Error(socket.connected ? 'Keine Antwort vom Server – versuch es nochmal' : 'Keine Verbindung zum Server'),
+      );
+    }, CALL_TIMEOUT_MS);
+    send((r) => {
+      window.clearTimeout(timer);
+      if (r.ok) resolve(r as T);
+      else reject(new Error(r.error));
+    });
   });
+}
+
+/** Technische Verbindungsfehler („xhr poll error“ …) verständlich machen. */
+export function connectErrorText(err: Error): string {
+  const technical = /xhr|poll|websocket|timeout|transport/i.test(err.message);
+  // Eigene Meldungen vom Server (z. B. „Zu viele Verbindungen …“) unverändert anzeigen
+  return technical || !err.message ? 'Server nicht erreichbar – neuer Versuch läuft …' : err.message;
 }
