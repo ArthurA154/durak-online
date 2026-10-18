@@ -235,25 +235,17 @@ export function Table({ view }: { view: GameView }) {
         : view.throwers.includes(me) && view.table.length < maxTable && undefended < defenderCards);
   /** Darf ich diese Karte anfassen/antippen? */
   const usable = (c: Card) => (hints ? fits(c) : myMove);
-  /** Ohne Hilfen: weiterschieben anbieten, solange noch nichts geschlagen ist (prüft der Server) */
-  const mayTransfer = (c: Card) =>
-    hints
-      ? canTransferWith(c)
-      : isDefender && !view.taking && view.table.length > 0 && view.table.every((t) => !t.defense);
+  /** Offene Angriffskarten. Ohne Hilfen sind alle wählbar – ob die Karte schlägt, prüft der Server. */
+  const openTargets = (c: Card) =>
+    hints ? defendTargets(c) : view.taking ? [] : view.table.flatMap((t, i) => (t.defense ? [] : [i]));
 
   // ---------- Klicken und Ziehen ----------
 
   const onTap = (card: Card) => {
     if (!usable(card)) return;
     if (!isDefender) return attack(card);
-    if (!hints) {
-      // Nur eine offene Karte und Weiterschieben geht nicht mehr → direkt drauf; sonst auswählen
-      const open = view.table.flatMap((t, i) => (t.defense ? [] : [i]));
-      if (open.length === 1 && !mayTransfer(card)) return defend(card, open[0]);
-      setSelected(selected && sameCard(selected, card) ? null : card);
-      return;
-    }
-    const targets = defendTargets(card);
+    // Weiterschieben sieht man selbst (gleicher Rang) – das ist kein Hinweis und gilt immer
+    const targets = openTargets(card);
     // Eindeutig → sofort schlagen; sonst auswählen und Ziel/Knopf wählen lassen
     if (targets.length === 1 && !canTransferWith(card)) return defend(card, targets[0]);
     setSelected(selected && sameCard(selected, card) ? null : card);
@@ -263,21 +255,16 @@ export function Table({ view }: { view: GameView }) {
     if (!zone) return;
     if (!isDefender) return attack(card);
     if (zone.startsWith('attack-')) return defend(card, Number(zone.slice(7)));
-    if (mayTransfer(card)) return transfer(card);
-    const targets = defendTargets(card);
+    if (canTransferWith(card)) return transfer(card);
+    const targets = openTargets(card);
     if (targets.length === 1) return defend(card, targets[0]);
     if (targets.length > 1) setError(t('dragOntoTarget'));
   };
 
   const active = dragging ?? selected;
   // Mit Hilfen: nur passende Ziele markieren. Ohne: alle offenen Karten sind wählbar (verrät nichts)
-  const activeTargets =
-    !active || !isDefender
-      ? []
-      : hints
-        ? defendTargets(active)
-        : view.table.flatMap((t, i) => (t.defense || view.taking ? [] : [i]));
-  const activeTransfer = !!active && mayTransfer(active);
+  const activeTargets = !active || !isDefender ? [] : openTargets(active);
+  const activeTransfer = !!active && canTransferWith(active);
   const tableGlows = !!dragging && (isDefender ? activeTransfer : hints ? canAttackWith(dragging) : myMove);
 
   // ---------- Woher kommen neue Karten? ----------

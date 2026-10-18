@@ -23,10 +23,12 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
   }
   // „Nur Nachbarn“: wer gegenüber sitzt, schaut bei dieser Runde nur zu
   const sidelined = !isDefender && !view.throwers.includes(me);
+  // Keine Karten mehr (Stapel noch nicht leer): nichts nachzulegen, nur warten
+  const waiting = view.passed.includes(me) || view.hand.length === 0;
   if (view.taking) {
     if (isDefender) return { text: t('turnYouTake'), mine: false };
     if (sidelined) return { text: t('turnTakesNeighbors', { name: name(view.defenderId) }), mine: false };
-    return view.passed.includes(me)
+    return waiting
       ? { text: t('turnTakesWait', { name: name(view.defenderId) }), mine: false }
       : { text: t('turnTakesThrowIn', { name: name(view.defenderId) }), mine: true };
   }
@@ -37,7 +39,5 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
   }
   if (isDefender) return { text: t('turnAllBeatenWait'), mine: false };
   if (sidelined) return { text: t('turnAllBeatenNeighbors'), mine: false };
-  return view.passed.includes(me)
-    ? { text: t('turnWaitOthers'), mine: false }
-    : { text: t('turnAllBeatenThrowIn'), mine: true };
+  return waiting ? { text: t('turnWaitOthers'), mine: false } : { text: t('turnAllBeatenThrowIn'), mine: true };
 }
