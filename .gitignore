@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.DS_Store
+*.log
+
+# Nur lokal: Infos zum Server/zu anderen Projekten und Bug-Screenshots
+CLAUDE.md
+bug/
