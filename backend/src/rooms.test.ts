@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AWAY_KICK_MS, TURN_MS, TURN_WARN_MS } from '@durak/shared';
-import { RoomManager, viewFor } from './rooms.js';
+import { RoomManager, cleanChat, viewFor } from './rooms.js';
+import { CHAT_KEEP, CHAT_MAX } from '@durak/shared';
 
 describe('Zug-Timer im Raum', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -150,3 +151,91 @@ describe('Zug-Timer im Raum', () => {
   });
 });
 
+
+describe('Chat und Werfen', () => {
+  function room2() {
+    const rooms = new RoomManager();
+    const { room, session: a } = rooms.create('Anna', 0, 's1');
+    const { session: b } = rooms.join(room.code, 'Ben', 1, 's2');
+    return { rooms, room, a: a.playerId, b: b.playerId };
+  }
+
+  it('Text wird gesäubert und gekürzt', () => {
+    expect(cleanChat('  hallo\n\n  du\u0000 ')).toBe('hallo du');
+    expect(cleanChat('x'.repeat(500))).toHaveLength(CHAT_MAX);
+    expect(cleanChat(undefined)).toBe('');
+  });
+
+  it('Nachricht mit Name und Farbe, leere wird abgelehnt', () => {
+    const { rooms, room, a } = room2();
+    const msg = rooms.chat(room, a, ' GG ');
+    expect(msg).toMatchObject({ from: a, name: 'Anna', color: 0, text: 'GG' });
+    expect(() => rooms.chat(room, a, '   ')).toThrow('Leere Nachricht');
+    expect(() => rooms.chat(room, 'fremd', 'hi')).toThrow();
+  });
+
+  it('Raum merkt sich nur die letzten Nachrichten', () => {
+    const { rooms, room, a } = room2();
+    for (let i = 0; i < CHAT_KEEP + 5; i++) rooms.chat(room, a, `n${i}`);
+    expect(room.chat).toHaveLength(CHAT_KEEP);
+    expect(room.chat[0].text).toBe('n5');
+  });
+
+  it('Werfen nur auf Mitspieler und nur erlaubte Sachen', () => {
+    const { rooms, room, a, b } = room2();
+    expect(rooms.throwAt(room, a, b, 'tomato')).toMatchObject({ from: a, to: b, item: 'tomato' });
+    expect(() => rooms.throwAt(room, a, a, 'fish')).toThrow('Nicht auf dich selbst');
+    expect(() => rooms.throwAt(room, a, b, 'brick')).toThrow();
+    expect(() => rooms.throwAt(room, a, 'niemand', 'egg')).toThrow();
+  });
+});
+
+describe('Öffentliche Räume und Einstellungen', () => {
+  it('nur öffentliche, wartende, nicht volle Räume stehen in der Liste', () => {
+    const rooms = new RoomManager();
+    const pub = rooms.create('Anna', 0, 's1', true).room;
+    rooms.create('Privat', 1, 's2');
+    expect(rooms.openLobbies()).toEqual([{ code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false }]);
+    const b = rooms.join(pub.code, 'Ben', 1, 's3').session;
+    rooms.start(pub, pub.hostId);
+    expect(rooms.openLobbies()).toEqual([]); // läuft → nicht mehr sichtbar
+    expect(b.playerId).toBeTruthy();
+  });
+
+  it('nur der Gastgeber ändert Einstellungen, nicht während der Partie', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const b = rooms.join(room.code, 'Ben', 1, 's2').session;
+    expect(() => rooms.updateSettings(room, b.playerId, { public: true })).toThrow('Nur der Gastgeber');
+    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true });
+    expect(room.settings).toEqual({ public: true, neighborsOnly: true });
+    rooms.start(room, session.playerId);
+    expect(room.game!.neighborsOnly).toBe(true);
+    expect(() => rooms.updateSettings(room, session.playerId, { public: false })).toThrow('Erst nach der Partie');
+  });
+
+  it('Gastgeber wirft jemanden aus der Lobby', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const b = rooms.join(room.code, 'Ben', 1, 's2').session;
+    expect(() => rooms.kickFromLobby(room, b.playerId, session.playerId)).toThrow('Nur der Gastgeber');
+    expect(rooms.kickFromLobby(room, session.playerId, b.playerId)).toBe('s2');
+    expect(room.players.map((p) => p.name)).toEqual(['Anna']);
+  });
+
+  it('Rausgeworfene kommen nicht wieder in denselben Raum', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1', true, '1.1.1.1');
+    const b = rooms.join(room.code, 'Troll', 1, 's2', '6.6.6.6').session;
+    rooms.kickFromLobby(room, session.playerId, b.playerId);
+    expect(() => rooms.join(room.code, 'Troll2', 1, 's3', '6.6.6.6')).toThrow('entfernt');
+    expect(rooms.join(room.code, 'Ben', 2, 's4', '2.2.2.2').room).toBe(room);
+  });
+
+  it('öffentlich: nur Schnellsprüche im Chat', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1', true);
+    expect(rooms.chat(room, session.playerId, 'GG').text).toBe('GG');
+    expect(() => rooms.chat(room, session.playerId, 'hallo')).toThrow('Schnellsprüche');
+  });
+});

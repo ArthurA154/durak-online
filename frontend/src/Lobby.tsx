@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MAX_PLAYERS, MIN_PLAYERS, type GameView } from '@durak/shared';
 import { call, socket } from './socket';
 import { Seat, type SeatPos } from './Seat';
+import { Segmented } from './Segmented';
 
 const CHAIRS: SeatPos[] = ['bottom', 'left', 'top', 'right'];
 
@@ -15,6 +16,16 @@ export function Lobby({ view }: { view: GameView }) {
   const start = () => {
     setError('');
     call((ack) => socket.emit('game:start', ack)).catch((e: Error) => setError(e.message));
+  };
+
+  const change = (settings: Partial<GameView['settings']>) => {
+    setError('');
+    call((ack) => socket.emit('room:settings', settings, ack)).catch((e: Error) => setError(e.message));
+  };
+
+  const kick = (playerId: string) => {
+    setError('');
+    call((ack) => socket.emit('room:kick', { playerId }, ack)).catch((e: Error) => setError(e.message));
   };
 
   const copy = async () => {
@@ -56,12 +67,47 @@ export function Lobby({ view }: { view: GameView }) {
               hat={p.id === view.lastDurakId}
               offline={!p.connected}
               note={[p.id === view.you && 'du', p.id === view.hostId && 'Gastgeber'].filter(Boolean).join(', ') || undefined}
+              action={
+                isHost && p.id !== view.you ? (
+                  <button type="button" className="kick-btn" onClick={() => kick(p.id)} aria-label={`${p.name} rauswerfen`}>
+                    rauswerfen
+                  </button>
+                ) : undefined
+              }
             />
           ) : (
             <Seat key={pos} pos={pos} empty />
           );
         })}
       </div>
+
+      {isHost ? (
+        <div className="room-settings">
+          <Segmented
+            label="Raum"
+            value={view.settings.public}
+            options={[
+              { value: false, label: 'Privat' },
+              { value: true, label: 'Öffentlich' },
+            ]}
+            onChange={(v) => change({ public: v })}
+          />
+          <Segmented
+            label="Nachlegen"
+            value={view.settings.neighborsOnly}
+            options={[
+              { value: false, label: 'Alle' },
+              { value: true, label: 'Nur Nachbarn' },
+            ]}
+            onChange={(v) => change({ neighborsOnly: v })}
+          />
+        </div>
+      ) : (
+        <p className="lobby-note">
+          {view.settings.public ? 'Öffentlicher Raum' : 'Privater Raum'} · Nachlegen:{' '}
+          {view.settings.neighborsOnly ? 'nur Nachbarn' : 'alle'}
+        </p>
+      )}
 
       {isHost ? (
         <button type="button" className="btn" onClick={start} disabled={!enough}>

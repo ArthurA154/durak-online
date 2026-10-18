@@ -6,6 +6,9 @@ import { Lobby } from './Lobby';
 import { Table } from './Table';
 import { AudioToggles } from './AudioToggles';
 import { Leaderboard } from './Leaderboard';
+import { Chat } from './Chat';
+import { FxLayer } from './FxLayer';
+import { setMe } from './social';
 import { useGameSounds } from './useGameSounds';
 
 /** Pro Verbindung nur einmal wiederverbinden (sonst kam es doppelt beim Server an) */
@@ -19,6 +22,7 @@ export function App() {
   const [slow, setSlow] = useState(false);
   // Nachricht vom Betreiber (z. B. „Server startet gleich neu“)
   const [notice, setNotice] = useState<string | null>(null);
+  const [kicked, setKicked] = useState(false);
 
   useEffect(() => {
     const onConnect = () => {
@@ -39,9 +43,19 @@ export function App() {
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
-    socket.on('state', setView);
+    const onState = (v: GameView) => {
+      setView(v);
+      setKicked(false);
+    };
+    socket.on('state', onState);
     const onNotice = (n: { text: string } | null) => setNotice(n?.text ?? null);
     socket.on('notice', onNotice);
+    const onKicked = () => {
+      saveSession(null);
+      setView(null);
+      setKicked(true);
+    };
+    socket.on('kicked', onKicked);
     if (socket.connected) onConnect();
     const slowTimer = window.setTimeout(() => setSlow(true), 2500);
     return () => {
@@ -49,12 +63,14 @@ export function App() {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
-      socket.off('state', setView);
+      socket.off('state', onState);
       socket.off('notice', onNotice);
+      socket.off('kicked', onKicked);
     };
   }, []);
 
   useGameSounds(view);
+  useEffect(() => setMe(view?.you ?? null), [view?.you]);
 
   const leave = () => {
     if (view?.phase === 'playing' && !window.confirm('Wirklich gehen? Du wirst aus dem laufenden Spiel entfernt.'))
@@ -78,6 +94,7 @@ export function App() {
           <span />
         )}
         <div className="topbar-right">
+          {view && <Chat me={view.you} quickOnly={view.settings.public} />}
           <AudioToggles />
           {view && (
             <button type="button" className="btn ghost small" onClick={leave}>
@@ -99,9 +116,10 @@ export function App() {
           </button>
         </div>
       )}
-      {!view && <Home />}
+      {!view && <Home message={kicked ? 'Der Gastgeber hat dich aus dem Raum entfernt.' : ''} />}
       {view?.phase === 'lobby' && <Lobby view={view} />}
       {inGame && <Table view={view} />}
+      {view && <FxLayer me={view.you} />}
     </div>
   );
 }

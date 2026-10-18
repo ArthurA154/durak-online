@@ -1,8 +1,9 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
-import { AVATAR_COLORS, type Card, type Result, type Session } from '@durak/shared';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
+import { AVATAR_COLORS, MAX_PLAYERS, type Card, type OpenLobby, type Result, type Session } from '@durak/shared';
 import { call, saveSession, socket } from './socket';
 import { CardFace } from './CardView';
 import { Avatar } from './Avatar';
+import { Segmented } from './Segmented';
 
 const NAME_KEY = 'durak.name';
 const COLOR_KEY = 'durak.color';
@@ -31,12 +32,31 @@ function initialName(): string {
   }
 }
 
-export function Home() {
+/** Liste offener Spiele – live vom Server, solange die Startseite offen ist */
+function useOpenLobbies(): OpenLobby[] {
+  const [list, setList] = useState<OpenLobby[]>([]);
+  useEffect(() => {
+    const watch = () => socket.emit('lobbies:watch');
+    socket.on('lobbies', setList);
+    socket.on('connect', watch);
+    if (socket.connected) watch();
+    return () => {
+      socket.emit('lobbies:unwatch');
+      socket.off('lobbies', setList);
+      socket.off('connect', watch);
+    };
+  }, []);
+  return list;
+}
+
+export function Home({ message = '' }: { message?: string }) {
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const [code, setCode] = useState(() => (new URLSearchParams(location.search).get('raum') ?? '').toUpperCase());
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const lobbies = useOpenLobbies();
   const invited = code.length === 5;
 
   const run = async (send: (ack: (r: Result<Session>) => void) => void) => {
@@ -60,8 +80,11 @@ export function Home() {
 
   const create = (e: FormEvent) => {
     e.preventDefault();
-    run((ack) => socket.emit('room:create', { name, color }, ack));
+    run((ack) => socket.emit('room:create', { name, color, public: isPublic }, ack));
   };
+
+  const joinOpen = (roomCode: string) =>
+    run((ack) => socket.emit('room:join', { roomCode, name, color }, ack));
 
   const join = (e: FormEvent) => {
     e.preventDefault();
@@ -81,6 +104,7 @@ export function Home() {
         <h1 className="hero-word">Дурак</h1>
       </div>
 
+      <div className="home-main">
       <div className="panel">
         <div className="me-editor">
           <div className="me-preview">
@@ -107,6 +131,15 @@ export function Home() {
         </div>
 
         <div className="panel-actions">
+          <Segmented
+            label="Neuer Raum"
+            value={isPublic}
+            options={[
+              { value: false, label: 'Privat' },
+              { value: true, label: 'Öffentlich' },
+            ]}
+            onChange={setIsPublic}
+          />
           <form onSubmit={create}>
             <button type="submit" className={`btn wide${invited ? ' ghost' : ''}`} disabled={busy || !name.trim()}>
               Raum erstellen
@@ -127,7 +160,41 @@ export function Home() {
             </button>
           </form>
         </div>
-        {error && <p className="form-error">{error}</p>}
+        {(error || message) && <p className="form-error">{error || message}</p>}
+      </div>
+
+      <section className="panel open-games" aria-labelledby="open-games-title">
+        <h2 id="open-games-title">Offene Spiele</h2>
+        {lobbies.length === 0 ? (
+          <p className="open-empty">Gerade wartet niemand. Erstell einen öffentlichen Raum – dann taucht er hier auf.</p>
+        ) : (
+          <ul className="open-list">
+            {lobbies.map((l) => (
+              <li key={l.code}>
+                <span className="avatar small">
+                  <Avatar color={l.color} expression="happy" seed={l.code} />
+                </span>
+                <span className="open-info">
+                  <b>{l.host}</b>
+                  <span>
+                    {l.players}/{MAX_PLAYERS} Spieler{l.neighborsOnly ? ' · nur Nachbarn legen nach' : ''}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="btn small"
+                  disabled={busy || !name.trim()}
+                  title={name.trim() ? undefined : 'Erst oben deinen Namen eingeben'}
+                  onClick={() => joinOpen(l.code)}
+                >
+                  Mitspielen
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {lobbies.length > 0 && !name.trim() && <p className="open-hint">Gib zuerst deinen Namen ein.</p>}
+      </section>
       </div>
     </main>
   );

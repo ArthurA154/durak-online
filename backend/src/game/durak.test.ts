@@ -385,3 +385,41 @@ describe('Spieler verlässt die Partie', () => {
   });
 });
 
+
+describe('Nachlegen nur für Nachbarn', () => {
+  function fourPlayers(neighborsOnly: boolean) {
+    const g = new DurakGame(['a', 'b', 'c', 'd'], shuffle(createDeck()), { neighborsOnly });
+    g.attackerIdx = 0;
+    g.defenderIdx = 1;
+    g.players[0].hand = [c(7, 'S'), c(12, 'S')];
+    g.players[1].hand = [c(9, 'S'), c(10, 'S'), c(11, 'S')];
+    g.players[2].hand = [c(7, 'H'), c(6, 'H')];
+    g.players[3].hand = [c(7, 'D'), c(6, 'D')];
+    return g;
+  }
+
+  it('gegenüber darf nicht nachlegen, der andere Nachbar schon', () => {
+    const g = fourPlayers(true);
+    g.attack('a', c(7, 'S'));
+    expect(() => g.attack('d', c(7, 'D'))).toThrow('Nur die Nachbarn');
+    g.attack('c', c(7, 'H'));
+    expect(g.table).toHaveLength(2);
+  });
+
+  it('auf den Gegenüber wird nicht gewartet', () => {
+    const g = fourPlayers(true);
+    g.attack('a', c(7, 'S'));
+    g.defend('b', 0, c(9, 'S'));
+    expect(g.waitingOn().sort()).toEqual(['a', 'c']);
+    g.pass('a');
+    g.pass('c');
+    expect(g.table).toEqual([]); // Runde vorbei, ohne dass d passen musste
+  });
+
+  it('ohne die Regel dürfen alle', () => {
+    const g = fourPlayers(false);
+    g.attack('a', c(7, 'S'));
+    g.attack('d', c(7, 'D'));
+    expect(g.table).toHaveLength(2);
+  });
+});

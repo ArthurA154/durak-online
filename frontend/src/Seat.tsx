@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { CardBack } from './CardView';
 import { Avatar, type Expression } from './Avatar';
 
@@ -27,6 +27,8 @@ interface Props {
   out?: boolean;
   cardCount?: number;
   note?: string;
+  /** z. B. „rauswerfen“-Knopf in der Lobby */
+  action?: ReactNode;
   /** Sichtbarer Zug-Countdown (letzte 10 s) */
   countdown?: { seconds: number; fraction: number } | null;
 }
@@ -79,6 +81,7 @@ export function Seat(props: Props) {
       </div>
       <div className="seat-name">{empty ? 'frei' : name}</div>
       {note && <div className="seat-note">{note}</div>}
+      {props.action}
     </div>
   );
 }

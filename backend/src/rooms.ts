@@ -2,6 +2,15 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AVATAR_COLORS,
   AWAY_KICK_MS,
+  CHAT_KEEP,
+  CHAT_MAX,
+  QUICK_PHRASES,
+  type OpenLobby,
+  type RoomSettings,
+  THROW_ITEMS,
+  type ChatMessage,
+  type ThrowEvent,
+  type ThrowItem,
   MAX_PLAYERS,
   MIN_PLAYERS,
   TURN_MS,
@@ -19,6 +28,8 @@ export interface RoomPlayer {
   awaySince: number | null;
   color: number;
   durakCount: number;
+  /** Adresse – nur im Speicher, damit Rausgeworfene nicht gleich wieder reinkommen */
+  ip: string;
 }
 
 export interface Room {
@@ -41,6 +52,11 @@ export interface Room {
   /** Start der aktuellen Partie und wer da mitgespielt hat (für die Statistik) */
   gameStartedAt: number | null;
   gamePlayers: string[];
+  /** Letzte Chat-Nachrichten (nur im Speicher) */
+  chat: ChatMessage[];
+  settings: RoomSettings;
+  /** Adressen, die der Gastgeber rausgeworfen hat */
+  banned: Set<string>;
 }
 
 export type GameOutcome = 'durak' | 'draw' | 'aborted';
@@ -53,6 +69,17 @@ export interface RoomEvents {
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+let seq = 0;
+
+/** Chat-Text säubern: Steuerzeichen raus, Leerraum zusammenfassen, kürzen */
+export function cleanChat(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, CHAT_MAX);
+}
 
 const isRunning = (room: Room) => !!room.game && !room.game.finished;
 
@@ -74,13 +101,13 @@ export class RoomManager {
     return this.rooms.size;
   }
 
-  create(name: string, color: number, socketId: string): { room: Room; session: Session } {
+  create(name: string, color: number, socketId: string, isPublic = false, ip = ''): { room: Room; session: Session } {
     let code: string;
     do {
       code = Array.from(randomBytes(5), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
     } while (this.rooms.has(code));
 
-    const player = newPlayer(name, color, socketId);
+    const player = newPlayer(name, color, socketId, ip);
     const room: Room = {
       code,
       hostId: player.id,
@@ -96,19 +123,23 @@ export class RoomManager {
       createdAt: Date.now(),
       gameStartedAt: null,
       gamePlayers: [],
+      chat: [],
+      settings: { public: isPublic, neighborsOnly: false },
+      banned: new Set(),
     };
     this.rooms.set(code, room);
     this.events.roomCreated?.(room);
     return { room, session: sessionOf(room, player) };
   }
 
-  join(code: string, name: string, color: number, socketId: string): { room: Room; session: Session } {
+  join(code: string, name: string, color: number, socketId: string, ip = ''): { room: Room; session: Session } {
     const room = this.get(code);
     if (!room) throw new GameError('Raum nicht gefunden');
+    if (ip && room.banned.has(ip)) throw new GameError('Der Gastgeber hat dich aus diesem Raum entfernt');
     if (isRunning(room)) throw new GameError('Das Spiel läuft bereits');
     if (room.players.length >= MAX_PLAYERS) throw new GameError('Der Raum ist voll');
 
-    const player = newPlayer(name, color, socketId);
+    const player = newPlayer(name, color, socketId, ip);
     room.players.push(player);
     room.emptySince = null;
     return { room, session: sessionOf(room, player) };
@@ -122,6 +153,70 @@ export class RoomManager {
     player.awaySince = null;
     room.emptySince = null;
     return { room, session: sessionOf(room, player) };
+  }
+
+  /** Chat-Nachricht eines Spielers im Raum */
+  chat(room: Room, playerId: string, raw: unknown, now = Date.now()): ChatMessage {
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p) throw new GameError('Du bist nicht in diesem Raum');
+    const text = cleanChat(raw);
+    if (!text) throw new GameError('Leere Nachricht');
+    if (room.settings.public && !QUICK_PHRASES.includes(text)) {
+      throw new GameError('In öffentlichen Räumen gehen nur Schnellsprüche');
+    }
+    const msg: ChatMessage = { id: ++seq, from: p.id, name: p.name, color: p.color, text, at: now };
+    room.chat.push(msg);
+    if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP);
+    return msg;
+  }
+
+  /** Etwas auf einen Mitspieler werfen (nur prüfen – gespeichert wird nichts) */
+  throwAt(room: Room, playerId: string, to: unknown, item: unknown): ThrowEvent {
+    if (!room.players.some((x) => x.id === playerId)) throw new GameError('Du bist nicht in diesem Raum');
+    if (!THROW_ITEMS.includes(item as ThrowItem)) throw new GameError('Das kann man nicht werfen');
+    const target = room.players.find((x) => x.id === to);
+    if (!target) throw new GameError('Diesen Spieler gibt es nicht');
+    if (target.id === playerId) throw new GameError('Nicht auf dich selbst');
+    return { id: ++seq, from: playerId, to: target.id, item: item as ThrowItem };
+  }
+
+  /** Gastgeber ändert Einstellungen – nicht während einer laufenden Partie */
+  updateSettings(room: Room, playerId: string, change: Partial<RoomSettings>): void {
+    if (room.hostId !== playerId) throw new GameError('Nur der Gastgeber kann das ändern');
+    if (isRunning(room)) throw new GameError('Erst nach der Partie');
+    if (typeof change?.public === 'boolean') room.settings.public = change.public;
+    if (typeof change?.neighborsOnly === 'boolean') room.settings.neighborsOnly = change.neighborsOnly;
+  }
+
+  /** Gastgeber wirft jemanden aus dem Raum (nicht während einer Partie). Gibt dessen Verbindung zurück. */
+  kickFromLobby(room: Room, byId: string, targetId: string): string | null {
+    if (room.hostId !== byId) throw new GameError('Nur der Gastgeber kann Spieler entfernen');
+    if (isRunning(room)) throw new GameError('Erst nach der Partie');
+    const target = room.players.find((p) => p.id === targetId);
+    if (!target) throw new GameError('Diesen Spieler gibt es nicht mehr');
+    if (target.id === byId) throw new GameError('Du kannst dich nicht selbst entfernen');
+    const socketId = target.socketId;
+    if (target.ip) room.banned.add(target.ip);
+    this.removePlayer(room, target);
+    return socketId;
+  }
+
+  /** Öffentliche Räume, die noch auf Spieler warten (keine laufenden oder fertigen Partien) */
+  openLobbies(): OpenLobby[] {
+    const list: OpenLobby[] = [];
+    for (const room of this.rooms.values()) {
+      const host = room.players.find((p) => p.id === room.hostId);
+      if (!room.settings.public || room.game || !host?.socketId) continue;
+      if (room.players.length >= MAX_PLAYERS) continue;
+      list.push({
+        code: room.code,
+        host: host.name,
+        color: host.color,
+        players: room.players.length,
+        neighborsOnly: room.settings.neighborsOnly,
+      });
+    }
+    return list.slice(0, 50);
   }
 
   /** Mitten im Spiel ist jemand getrennt → keine Züge, Timer steht. */
@@ -139,7 +234,7 @@ export class RoomManager {
     const ids = room.players.map((p) => p.id);
     // Der Durak der letzten Partie mischt und greift zuerst an
     const durak = room.lastDurakId;
-    room.game = new DurakGame(ids, undefined, { firstAttackerId: durak });
+    room.game = new DurakGame(ids, undefined, { firstAttackerId: durak, neighborsOnly: room.settings.neighborsOnly });
     room.dealerId = durak;
     room.round++;
     room.resultRecorded = false;
@@ -308,10 +403,12 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
     dealerId: room.dealerId,
     round: room.round,
     paused: isRunning(room) && room.players.some((p) => !p.socketId),
+    settings: { ...room.settings },
+    throwers: g && !g.finished ? g.throwers().map((p) => p.id) : [],
   };
 }
 
-function newPlayer(name: string, color: number, socketId: string): RoomPlayer {
+function newPlayer(name: string, color: number, socketId: string, ip: string): RoomPlayer {
   const clean = name.trim().slice(0, 20);
   if (!clean) throw new GameError('Bitte einen Namen eingeben');
   const validColor = Number.isInteger(color) && color >= 0 && color < AVATAR_COLORS.length ? color : 0;
@@ -323,6 +420,7 @@ function newPlayer(name: string, color: number, socketId: string): RoomPlayer {
     awaySince: null,
     color: validColor,
     durakCount: 0,
+    ip,
   };
 }
 

@@ -18,8 +18,11 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
       ? { text: 'Du greifst an: Zieh eine Karte auf den Tisch.', mine: true }
       : { text: `${name(view.attackerId)} greift an${isDefender ? ' – du verteidigst gleich' : ''} …`, mine: false };
   }
+  // „Nur Nachbarn“: wer gegenüber sitzt, schaut bei dieser Runde nur zu
+  const sidelined = !isDefender && !view.throwers.includes(me);
   if (view.taking) {
     if (isDefender) return { text: 'Du schluckst. Die anderen dürfen noch passende Karten nachlegen …', mine: false };
+    if (sidelined) return { text: `${name(view.defenderId)} schluckt – nur die Nachbarn dürfen nachlegen.`, mine: false };
     return view.passed.includes(me)
       ? { text: `${name(view.defenderId)} schluckt – warte auf die anderen …`, mine: false }
       : { text: `${name(view.defenderId)} schluckt. Leg passende Karten nach oder drück „Fertig“.`, mine: true };
@@ -30,6 +33,7 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
       : { text: `${name(view.defenderId)} verteidigt …`, mine: false };
   }
   if (isDefender) return { text: 'Alles geschlagen – warte, ob nachgelegt wird …', mine: false };
+  if (sidelined) return { text: 'Alles geschlagen – nur die Nachbarn dürfen nachlegen.', mine: false };
   return view.passed.includes(me)
     ? { text: 'Warte auf die anderen …', mine: false }
     : { text: 'Alles geschlagen. Leg passende Karten nach oder drück „Fertig“.', mine: true };

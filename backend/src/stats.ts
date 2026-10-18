@@ -20,6 +20,9 @@ export interface DayStats {
   peakOnline: number;
   peakGames: number;
   limited: number;
+  /** Nur Anzahl – Inhalte werden nie gespeichert */
+  chats: number;
+  throws: number;
 }
 
 export interface GameRecord {
@@ -72,6 +75,8 @@ const emptyDay = (date: string): DayStats => ({
   peakOnline: 0,
   peakGames: 0,
   limited: 0,
+  chats: 0,
+  throws: 0,
 });
 
 /**
@@ -133,6 +138,16 @@ export class Stats {
     this.dirty = true;
   }
 
+  chat(): void {
+    this.today().chats++;
+    this.dirty = true;
+  }
+
+  thrown(): void {
+    this.today().throws++;
+    this.dirty = true;
+  }
+
   limited(): void {
     this.today().limited++;
     this.dirty = true;
@@ -181,6 +196,8 @@ export class Stats {
       t.playMs += d.playMs;
       t.players += d.players;
       t.limited += d.limited;
+      t.chats += d.chats;
+      t.throws += d.throws;
       t.peakOnline = Math.max(t.peakOnline, d.peakOnline);
     }
     const { date: _d, peakGames: _p, ...rest } = t;

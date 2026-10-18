@@ -50,12 +50,15 @@ export class DurakGame {
   passed = new Set<string>();
   finished = false;
   durakId: string | null = null;
+  /** Nachlegen nur für die beiden Nachbarn des Verteidigers (sonst alle) */
+  readonly neighborsOnly: boolean;
 
   constructor(
     playerIds: string[],
     deck: Card[] = shuffle(createDeck()),
-    opts: { firstAttackerId?: string | null } = {},
+    opts: { firstAttackerId?: string | null; neighborsOnly?: boolean } = {},
   ) {
+    this.neighborsOnly = !!opts.neighborsOnly;
     if (playerIds.length < MIN_PLAYERS || playerIds.length > MAX_PLAYERS) {
       throw new GameError(`${MIN_PLAYERS}–${MAX_PLAYERS} Spieler nötig`);
     }
@@ -88,6 +91,18 @@ export class DurakGame {
     return p.hand.length === 0 && this.deck.length === 0;
   }
 
+  /** Darf dieser Spieler gerade Karten nachlegen? (nicht der Verteidiger, hat Karten, ggf. nur Nachbarn) */
+  mayThrowIn(p: GamePlayer): boolean {
+    if (p === this.defender || p.hand.length === 0) return false;
+    if (!this.neighborsOnly) return true;
+    return p === this.attacker || p === this.players[this.nextActive(this.defenderIdx)];
+  }
+
+  /** Wer darf in dieser Runde nachlegen? */
+  throwers(): GamePlayer[] {
+    return this.players.filter((p) => this.mayThrowIn(p));
+  }
+
   // ---------- Züge ----------
 
   attack(playerId: string, card: Card): void {
@@ -96,6 +111,8 @@ export class DurakGame {
     if (p === this.defender) throw new GameError('Der Verteidiger kann nicht angreifen');
     if (this.table.length === 0) {
       if (p !== this.attacker) throw new GameError('Nur der Angreifer darf den ersten Zug machen');
+    } else if (!this.mayThrowIn(p)) {
+      throw new GameError('Nur die Nachbarn des Verteidigers dürfen nachlegen');
     } else if (!this.tableRanks().has(card.rank)) {
       throw new GameError('Nur Karten mit einem Wert, der schon auf dem Tisch liegt');
     }
@@ -214,8 +231,8 @@ export class DurakGame {
     if (this.finished) return [];
     if (this.table.length === 0) return [this.attacker.id];
     if (!this.taking && this.table.some((t) => !t.defense)) return [this.defender.id];
-    return this.players
-      .filter((p) => p !== this.defender && p.hand.length > 0 && !this.passed.has(p.id))
+    return this.throwers()
+      .filter((p) => !this.passed.has(p.id))
       .map((p) => p.id);
   }
 
@@ -267,9 +284,7 @@ export class DurakGame {
       // Verteidiger ist dran – außer er hat keine Karten mehr (kann nicht passieren, da Limit).
       return;
     }
-    const waitingFor = this.players.filter(
-      (p) => p !== this.defender && p.hand.length > 0 && !this.passed.has(p.id),
-    );
+    const waitingFor = this.throwers().filter((p) => !this.passed.has(p.id));
     if (this.roomForAttack() && waitingFor.length > 0) return;
     this.endBout();
   }

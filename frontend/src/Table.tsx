@@ -224,7 +224,7 @@ export function Table({ view }: { view: GameView }) {
     !finished &&
     !isDefender &&
     view.table.length < MAX_TABLE &&
-    (view.table.length === 0 ? isAttacker : tableRanks.has(c.rank));
+    (view.table.length === 0 ? isAttacker : view.throwers.includes(me) && tableRanks.has(c.rank));
 
   const defendTargets = (c: Card) =>
     !isDefender || view.taking
@@ -461,7 +461,7 @@ export function Table({ view }: { view: GameView }) {
 
       <section className={`me${turn.mine ? ' my-turn' : ''}`}>
         <div className="me-bar">
-          <div className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}`}>
+          <div className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}`} data-seat={me}>
             <span className="avatar small">
               <Avatar
                 color={meInfo?.color ?? 0}
@@ -503,6 +503,7 @@ export function Table({ view }: { view: GameView }) {
                 </button>
               )}
               {!isDefender &&
+                view.throwers.includes(me) &&
                 view.table.length > 0 &&
                 (allDefended || view.taking) &&
                 !view.passed.includes(me) &&

@@ -59,6 +59,24 @@ export interface TablePair {
 
 export type Phase = 'lobby' | 'playing' | 'finished';
 
+/** Einstellungen eines Raums – ändert der Gastgeber in der Lobby */
+export interface RoomSettings {
+  /** In der Liste offener Spiele sichtbar (sonst nur mit Code) */
+  public: boolean;
+  /** Nachlegen nur für die beiden Nachbarn des Verteidigers */
+  neighborsOnly: boolean;
+}
+
+/** Eintrag in der Liste offener Spiele auf der Startseite */
+export interface OpenLobby {
+  code: string;
+  host: string;
+  /** Index in AVATAR_COLORS */
+  color: number;
+  players: number;
+  neighborsOnly: boolean;
+}
+
 export interface PlayerView {
   id: string;
   name: string;
@@ -105,6 +123,9 @@ export interface GameView {
   round: number;
   /** Jemand ist mitten im Spiel getrennt → keine Züge, Timer steht */
   paused: boolean;
+  settings: RoomSettings;
+  /** Wer gerade nachlegen darf (bei „nur Nachbarn“ nicht alle) */
+  throwers: string[];
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -115,11 +136,47 @@ export interface Session {
   token: string;
 }
 
+// ---------- Chat & Werfen ----------
+
+export const CHAT_MAX = 120;
+
+/** Schnellsprüche – in öffentlichen Räumen die einzigen erlaubten Nachrichten */
+export const QUICK_PHRASES = ['😂', '👍', 'GG', 'Schluck!', 'Glück gehabt 🍀', 'Warte nur …', 'Ну ты дурак 😂'];
+/** So viele Nachrichten merkt sich ein Raum */
+export const CHAT_KEEP = 50;
+
+export interface ChatMessage {
+  id: number;
+  from: string;
+  name: string;
+  /** Index in AVATAR_COLORS */
+  color: number;
+  text: string;
+  at: number;
+}
+
+export const THROW_ITEMS = ['tomato', 'slipper', 'egg', 'flowers', 'fish'] as const;
+export type ThrowItem = (typeof THROW_ITEMS)[number];
+
+export interface ThrowEvent {
+  id: number;
+  from: string;
+  to: string;
+  item: ThrowItem;
+}
+
 export interface ClientToServerEvents {
-  'room:create': (p: { name: string; color: number }, ack: (r: Result<Session>) => void) => void;
+  'room:create': (p: { name: string; color: number; public?: boolean }, ack: (r: Result<Session>) => void) => void;
   'room:join': (p: { roomCode: string; name: string; color: number }, ack: (r: Result<Session>) => void) => void;
   'room:rejoin': (p: { roomCode: string; token: string }, ack: (r: Result<Session>) => void) => void;
   'room:leave': () => void;
+  /** Gastgeber: Einstellungen ändern (nicht während einer Partie) */
+  'room:settings': (p: Partial<RoomSettings>, ack: (r: Result) => void) => void;
+  /** Gastgeber: Spieler aus der Lobby werfen */
+  'room:kick': (p: { playerId: string }, ack: (r: Result) => void) => void;
+  /** Startseite: Liste offener Spiele abonnieren / abbestellen */
+  'lobbies:watch': () => void;
+  'lobbies:unwatch': () => void;
   'game:start': (ack: (r: Result) => void) => void;
   'game:attack': (p: { card: Card }, ack: (r: Result) => void) => void;
   'game:defend': (p: { attackIndex: number; card: Card }, ack: (r: Result) => void) => void;
@@ -128,10 +185,20 @@ export interface ClientToServerEvents {
   'game:pass': (ack: (r: Result) => void) => void;
   /** Getrennten Spieler nach der Pause aus dem Raum entfernen */
   'game:kick': (p: { playerId: string }, ack: (r: Result) => void) => void;
+  'chat:send': (p: { text: string }, ack: (r: Result) => void) => void;
+  /** Etwas auf einen Mitspieler werfen */
+  throw: (p: { to: string; item: ThrowItem }, ack: (r: Result) => void) => void;
 }
 
 export interface ServerToClientEvents {
   state: (view: GameView) => void;
   /** Nachricht vom Betreiber an alle (null = weg) */
   notice: (notice: { text: string } | null) => void;
+  chat: (msg: ChatMessage) => void;
+  /** Ganzer Verlauf beim Betreten/Wiederverbinden */
+  'chat:history': (msgs: ChatMessage[]) => void;
+  throw: (t: ThrowEvent) => void;
+  lobbies: (list: OpenLobby[]) => void;
+  /** Du wurdest vom Gastgeber aus dem Raum entfernt */
+  kicked: () => void;
 }

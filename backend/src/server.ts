@@ -18,6 +18,7 @@ const CORS_ORIGIN = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 const DATA_DIR = process.env.DATA_DIR ?? 'data';
+const LOBBY_WATCHERS = 'lobby-watchers';
 const STARTED_AT = Date.now();
 
 interface SocketData {
@@ -66,6 +67,9 @@ const rooms = new RoomManager({
 const connections = new ConnectionCounter(20);
 const createLimit = new RateLimiter(10, 60_000);
 const joinLimit = new RateLimiter(30, 60_000);
+// pro Spieler: Chat höchstens 5 Nachrichten in 10 s, Werfen höchstens 1× in 2,5 s
+const chatLimit = new RateLimiter(5, 10_000);
+const throwLimit = new RateLimiter(1, 2_500);
 
 function clientIp(socket: IoSocket): string {
   return ipFrom(socket.handshake.headers['x-forwarded-for'], socket.handshake.address);
@@ -92,6 +96,13 @@ io.use((socket, next) => {
   socket.on('disconnect', () => connections.close(ip));
   next();
 });
+
+/** Ereignis an alle verbundenen Spieler im Raum */
+function toRoom<E extends 'chat' | 'throw'>(room: Room, event: E, ...args: Parameters<ServerToClientEvents[E]>): void {
+  for (const p of room.players) {
+    if (p.socketId) io.to(p.socketId).emit(event, ...args);
+  }
+}
 
 function broadcast(room: Room): void {
   for (const p of room.players) {
@@ -135,17 +146,19 @@ io.on('connection', (socket: IoSocket) => {
     socket.data.playerId = playerId;
     // Pause vorbei? Dann läuft der Zug-Timer mit frischer Zeit weiter
     if (!room.timer) armTimer(room);
+    socket.emit('chat:history', room.chat);
     broadcast(room);
   };
 
-  socket.on('room:create', ({ name, color }, ack) => {
+  socket.on('room:create', (p, ack) => {
+    const { name, color } = p ?? {};
     if (typeof ack !== 'function') return;
     if (!createLimit.take(ip)) {
       stats.limited();
       return ack({ ok: false, error: 'Zu viele neue Räume – warte kurz' });
     }
     try {
-      const { room, session } = rooms.create(String(name ?? ''), Number(color), socket.id);
+      const { room, session } = rooms.create(String(name ?? ''), Number(color), socket.id, p?.public === true, ip);
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -160,7 +173,7 @@ io.on('connection', (socket: IoSocket) => {
       return ack({ ok: false, error: 'Zu viele Versuche – warte kurz' });
     }
     try {
-      const { room, session } = rooms.join(String(roomCode ?? ''), String(name ?? ''), Number(color), socket.id);
+      const { room, session } = rooms.join(String(roomCode ?? ''), String(name ?? ''), Number(color), socket.id, ip);
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -181,6 +194,28 @@ io.on('connection', (socket: IoSocket) => {
 
   socket.on('room:leave', () => leaveCurrent(socket));
 
+  socket.on('room:settings', (change, ack) =>
+    inRoom(socket, ack, (room, id) => rooms.updateSettings(room, id, change ?? {})),
+  );
+  socket.on('room:kick', ({ playerId: target } = { playerId: '' }, ack) =>
+    inRoom(socket, ack, (room, id) => {
+      const kickedSocket = rooms.kickFromLobby(room, id, String(target ?? ''));
+      const s = kickedSocket ? io.sockets.sockets.get(kickedSocket) : undefined;
+      if (s) {
+        s.data.roomCode = undefined;
+        s.data.playerId = undefined;
+        s.emit('kicked');
+      }
+    }),
+  );
+
+  // Startseite: Liste offener Spiele
+  socket.on('lobbies:watch', () => {
+    void socket.join(LOBBY_WATCHERS);
+    socket.emit('lobbies', rooms.openLobbies());
+  });
+  socket.on('lobbies:unwatch', () => void socket.leave(LOBBY_WATCHERS));
+
   socket.on('game:start', (ack) => inRoom(socket, ack, (room, id) => rooms.start(room, id)));
   socket.on('game:attack', ({ card }, ack) =>
     inRoom(socket, ack, (room, id) => requireGame(room).attack(id, card)),
@@ -195,6 +230,37 @@ io.on('connection', (socket: IoSocket) => {
   socket.on('game:pass', (ack) => inRoom(socket, ack, (room, id) => requireGame(room).pass(id)));
   socket.on('game:kick', ({ playerId: target }, ack) =>
     inRoom(socket, ack, (room, id) => rooms.kick(room, id, String(target ?? ''))),
+  );
+
+  /** Chat und Werfen: im aktuellen Raum, ohne den Spielstand neu zu senden */
+  const social = (ack: (r: Result) => void, limit: RateLimiter, action: (room: Room, playerId: string) => void) => {
+    if (typeof ack !== 'function') return;
+    const { roomCode, playerId } = socket.data;
+    const room = roomCode ? rooms.get(roomCode) : undefined;
+    if (!room || !playerId) return ack({ ok: false, error: 'Du bist in keinem Raum' });
+    if (!limit.take(playerId)) {
+      stats.limited();
+      return ack({ ok: false, error: 'Nicht so schnell!' });
+    }
+    try {
+      action(room, playerId);
+      ack({ ok: true });
+    } catch (err) {
+      ack(fail(err));
+    }
+  };
+
+  socket.on('chat:send', (p, ack) =>
+    social(ack, chatLimit, (room, id) => {
+      toRoom(room, 'chat', rooms.chat(room, id, p?.text));
+      stats.chat();
+    }),
+  );
+  socket.on('throw', (p, ack) =>
+    social(ack, throwLimit, (room, id) => {
+      toRoom(room, 'throw', rooms.throwAt(room, id, p?.to, p?.item));
+      stats.thrown();
+    }),
   );
 
   socket.on('disconnect', () => {
@@ -236,10 +302,22 @@ setInterval(() => {
   for (const room of rooms.cleanup(ROOM_IDLE_MS)) broadcast(room);
   createLimit.prune();
   joinLimit.prune();
+  chatLimit.prune();
+  throwLimit.prune();
   const { online, games } = liveCounts();
   stats.observe(online, games);
 }, 10_000).unref();
 setInterval(() => stats.save(), 30_000).unref();
+
+// Liste offener Spiele an alle auf der Startseite – nur wenn sie sich geändert hat
+let lastLobbies = '';
+setInterval(() => {
+  const list = rooms.openLobbies();
+  const json = JSON.stringify(list);
+  if (json === lastLobbies) return;
+  lastLobbies = json;
+  io.to(LOBBY_WATCHERS).emit('lobbies', list);
+}, 1_500).unref();
 
 // ---------- Admin-Seite ----------
 
@@ -268,6 +346,8 @@ const admin = createAdmin({
       const now = Date.now();
       const list = [...rooms.all()].map((r) => ({
         code: r.code,
+        public: r.settings.public,
+        neighborsOnly: r.settings.neighborsOnly,
         phase: !r.game ? 'lobby' : r.game.finished ? 'finished' : 'playing',
         paused: rooms.isPaused(r),
         round: r.round,

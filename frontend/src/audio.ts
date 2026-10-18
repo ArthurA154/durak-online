@@ -282,6 +282,36 @@ export const sfx = {
   bito: () => play((t) => burst(sfxBus, t, 0.4, 0.35, 'bandpass', 600, 5000)),
   win: () =>
     play((t) => [57, 64, 67, 71, 76].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.09, 1.6, 0.12))),
+  /** Chat-Nachricht: kurzes „Plopp“ */
+  chat: () => play((t) => sine(sfxBus, 660, t, 0.09, 0.12, 990)),
+  /** Etwas fliegt los */
+  whoosh: () => play((t) => burst(sfxBus, t, 0.35, 0.12, 'bandpass', 500, 2400)),
+  /** Treffer – je nach Gegenstand */
+  hit: (item: string) =>
+    play((t) => {
+      switch (item) {
+        case 'tomato': // Matsch
+          burst(sfxBus, t, 0.25, 0.45, 'lowpass', 1800, 250);
+          sine(sfxBus, 160, t, 0.12, 0.3, 70);
+          break;
+        case 'egg': // Knacks, dann Glibber
+          burst(sfxBus, t, 0.03, 0.35, 'highpass', 4000);
+          burst(sfxBus, t + 0.03, 0.03, 0.25, 'highpass', 3000);
+          burst(sfxBus, t + 0.07, 0.3, 0.25, 'lowpass', 1200, 300);
+          break;
+        case 'slipper': // Bonk
+          sine(sfxBus, 420, t, 0.22, 0.4, 90);
+          burst(sfxBus, t, 0.04, 0.3, 'bandpass', 1500);
+          break;
+        case 'flowers': // Ding-ding
+          [84, 88, 91].forEach((m, i) => epiano(sfxBus, mtof(m), t + i * 0.08, 0.9, 0.09));
+          break;
+        case 'fish': // Patsch, mit Wackeln
+          burst(sfxBus, t, 0.12, 0.5, 'bandpass', 1300, 700);
+          sine(sfxBus, 260, t + 0.05, 0.3, 0.15, 180);
+          break;
+      }
+    }),
   /** Für den Durak: absteigendes „wah-wah-wah-waaah“. */
   lose: () =>
     play((t) => {

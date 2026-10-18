@@ -218,7 +218,12 @@ function table(r, now) {
     'article',
     { class: `table ${r.phase}${r.paused ? ' paused' : ''}` },
     felt,
-    el('div', { class: 'table-meta' }, el('span', { class: 'code', text: r.code }), el('span', { class: 'dim', text: `${r.players.length}/4` })),
+    el(
+      'div',
+      { class: 'table-meta' },
+      el('span', { class: 'code', text: r.code }),
+      el('span', { class: 'dim', text: `${r.public ? 'öffentlich' : 'privat'}${r.neighborsOnly ? ' · Nachbarn' : ''} · ${r.players.length}/4` }),
+    ),
     players,
   );
 }
@@ -279,6 +284,8 @@ function renderTotals(t) {
     ['Räume erstellt', num(t.roomsCreated)],
     ['Rekord online', num(t.peakOnline)],
     ['Besuche (Summe)', num(t.visitors)],
+    ['Chat-Nachrichten', num(t.chats)],
+    ['Würfe 🍅', num(t.throws)],
     ['gebremst (Spam)', num(t.limited)],
   ]);
 }
