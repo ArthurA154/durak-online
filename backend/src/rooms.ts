@@ -148,14 +148,20 @@ export class RoomManager {
     return { room, session: sessionOf(room, player) };
   }
 
-  rejoin(code: string, token: string, socketId: string): { room: Room; session: Session } {
+  /** Wiederverbinden mit dem Token; gibt auch die bisherige Verbindung zurück (die damit ihren Platz verliert) */
+  rejoin(
+    code: string,
+    token: string,
+    socketId: string,
+  ): { room: Room; session: Session; previousSocketId: string | null } {
     const room = this.get(code);
     const player = room?.players.find((p) => p.token === token);
     if (!room || !player) throw new GameError('Sitzung abgelaufen');
+    const previousSocketId = player.socketId;
     player.socketId = socketId;
     player.awaySince = null;
     room.emptySince = null;
-    return { room, session: sessionOf(room, player) };
+    return { room, session: sessionOf(room, player), previousSocketId };
   }
 
   /** Chat-Nachricht eines Spielers im Raum */

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import { AVATAR_COLORS } from '@durak/shared';
 import { Server, type Socket } from 'socket.io';
-import type { ClientToServerEvents, Result, ServerToClientEvents } from '@durak/shared';
+import type { Card, ClientToServerEvents, Result, ServerToClientEvents } from '@durak/shared';
 import { GameError } from './game/durak.js';
 import { ConnectionCounter, RateLimiter } from './limits.js';
 import { RoomManager, viewFor, type Room } from './rooms.js';
@@ -70,6 +70,8 @@ const joinLimit = new RateLimiter(30, 60_000);
 // pro Spieler: Chat höchstens 5 Nachrichten in 10 s, Werfen höchstens 1× in 2,5 s
 const chatLimit = new RateLimiter(5, 10_000);
 const throwLimit = new RateLimiter(1, 2_500);
+// pro Verbindung: alle Nachrichten zusammen (normales Spielen bleibt weit darunter)
+const actionLimit = new RateLimiter(40, 10_000);
 
 function clientIp(socket: IoSocket): string {
   return ipFrom(socket.handshake.headers['x-forwarded-for'], socket.handshake.address);
@@ -120,8 +122,8 @@ function fail(err: unknown): { ok: false; error: string } {
 /** Führt eine Aktion im aktuellen Raum aus, meldet Fehler per ack und sendet den neuen Stand. */
 function inRoom(socket: IoSocket, ack: (r: Result) => void, action: (room: Room, playerId: string) => void) {
   if (typeof ack !== 'function') return;
-  const { roomCode, playerId } = socket.data;
-  const room = roomCode ? rooms.get(roomCode) : undefined;
+  const room = currentRoom(socket);
+  const playerId = socket.data.playerId;
   if (!room || !playerId) return ack({ ok: false, error: 'Du bist in keinem Raum' });
   try {
     action(room, playerId);
@@ -134,9 +136,46 @@ function inRoom(socket: IoSocket, ack: (r: Result) => void, action: (room: Room,
   }
 }
 
+/** Raum dieser Verbindung – aber nur, wenn sie noch die aktuelle des Spielers ist (nicht ein alter Tab) */
+function currentRoom(socket: IoSocket): Room | undefined {
+  const { roomCode, playerId } = socket.data;
+  const room = roomCode ? rooms.get(roomCode) : undefined;
+  const player = room?.players.find((p) => p.id === playerId);
+  return player?.socketId === socket.id ? room : undefined;
+}
+
+/** Karte vom Client nur als { rank, suit } übernehmen – Unsinn scheitert dann an den Spielregeln */
+function cardOf(raw: unknown): Card {
+  const c = (raw ?? {}) as Partial<Card>;
+  return { rank: Number(c.rank), suit: String(c.suit) } as Card;
+}
+
+/** Nachrichten vom Client: Objekt oder leeres Objekt (nie null/Zahl/…) */
+const obj = (p: unknown): Record<string, unknown> => (p && typeof p === 'object' ? (p as Record<string, unknown>) : {});
+
 io.on('connection', (socket: IoSocket) => {
   const ip = socket.data.ip ?? '';
   if (notice && notice.until > Date.now()) socket.emit('notice', { text: notice.text });
+
+  // Zu viele Nachrichten von dieser Verbindung → ablehnen, ohne sie zu verarbeiten
+  socket.use((packet, next) => {
+    if (actionLimit.take(socket.id)) return next();
+    stats.limited();
+    const ack = packet[packet.length - 1];
+    if (typeof ack === 'function') ack({ ok: false, error: 'Nicht so schnell!' });
+  });
+
+  /** Wie socket.on, aber ein Fehler im Handler (kaputte Nachricht) beendet nie den Server */
+  const on = <E extends keyof ClientToServerEvents>(event: E, handler: (...args: unknown[]) => void) =>
+    socket.on(event, ((...args: unknown[]) => {
+      try {
+        handler(...args);
+      } catch (err) {
+        const ack = args[args.length - 1];
+        const res = fail(err);
+        if (typeof ack === 'function') ack(res);
+      }
+    }) as never);
 
   const enter = (room: Room, playerId: string) => {
     // Gleicher Raum, gleicher Spieler (z. B. doppeltes Wiederverbinden) → nicht „verlassen“!
@@ -150,15 +189,15 @@ io.on('connection', (socket: IoSocket) => {
     broadcast(room);
   };
 
-  socket.on('room:create', (p, ack) => {
-    const { name, color } = p ?? {};
+  on('room:create', (raw, ack) => {
+    const p = obj(raw);
     if (typeof ack !== 'function') return;
     if (!createLimit.take(ip)) {
       stats.limited();
       return ack({ ok: false, error: 'Zu viele neue Räume – warte kurz' });
     }
     try {
-      const { room, session } = rooms.create(String(name ?? ''), Number(color), socket.id, p?.public === true, ip);
+      const { room, session } = rooms.create(String(p.name ?? ''), Number(p.color), socket.id, p.public === true, ip);
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -166,14 +205,21 @@ io.on('connection', (socket: IoSocket) => {
     }
   });
 
-  socket.on('room:join', ({ roomCode, name, color }, ack) => {
+  on('room:join', (raw, ack) => {
+    const p = obj(raw);
     if (typeof ack !== 'function') return;
     if (!joinLimit.take(ip)) {
       stats.limited();
       return ack({ ok: false, error: 'Zu viele Versuche – warte kurz' });
     }
     try {
-      const { room, session } = rooms.join(String(roomCode ?? ''), String(name ?? ''), Number(color), socket.id, ip);
+      const { room, session } = rooms.join(
+        String(p.roomCode ?? ''),
+        String(p.name ?? ''),
+        Number(p.color),
+        socket.id,
+        ip,
+      );
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -181,10 +227,26 @@ io.on('connection', (socket: IoSocket) => {
     }
   });
 
-  socket.on('room:rejoin', ({ roomCode, token }, ack) => {
+  on('room:rejoin', (raw, ack) => {
+    const p = obj(raw);
     if (typeof ack !== 'function') return;
+    if (!joinLimit.take(ip)) {
+      stats.limited();
+      return ack({ ok: false, error: 'Zu viele Versuche – warte kurz' });
+    }
     try {
-      const { room, session } = rooms.rejoin(String(roomCode ?? ''), String(token ?? ''), socket.id);
+      const { room, session, previousSocketId } = rooms.rejoin(
+        String(p.roomCode ?? ''),
+        String(p.token ?? ''),
+        socket.id,
+      );
+      // Die alte Verbindung (z. B. anderer Tab) verliert ihren Platz
+      const old =
+        previousSocketId && previousSocketId !== socket.id ? io.sockets.sockets.get(previousSocketId) : undefined;
+      if (old) {
+        old.data.roomCode = undefined;
+        old.data.playerId = undefined;
+      }
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -192,14 +254,14 @@ io.on('connection', (socket: IoSocket) => {
     }
   });
 
-  socket.on('room:leave', () => leaveCurrent(socket));
+  on('room:leave', () => leaveCurrent(socket));
 
-  socket.on('room:settings', (change, ack) =>
-    inRoom(socket, ack, (room, id) => rooms.updateSettings(room, id, change ?? {})),
+  on('room:settings', (raw, ack) =>
+    inRoom(socket, ack as (r: Result) => void, (room, id) => rooms.updateSettings(room, id, obj(raw))),
   );
-  socket.on('room:kick', ({ playerId: target } = { playerId: '' }, ack) =>
-    inRoom(socket, ack, (room, id) => {
-      const kickedSocket = rooms.kickFromLobby(room, id, String(target ?? ''));
+  on('room:kick', (raw, ack) =>
+    inRoom(socket, ack as (r: Result) => void, (room, id) => {
+      const kickedSocket = rooms.kickFromLobby(room, id, String(obj(raw).playerId ?? ''));
       const s = kickedSocket ? io.sockets.sockets.get(kickedSocket) : undefined;
       if (s) {
         s.data.roomCode = undefined;
@@ -210,31 +272,34 @@ io.on('connection', (socket: IoSocket) => {
   );
 
   // Startseite: Liste offener Spiele
-  socket.on('lobbies:watch', () => {
+  on('lobbies:watch', () => {
     void socket.join(LOBBY_WATCHERS);
     socket.emit('lobbies', rooms.openLobbies());
   });
-  socket.on('lobbies:unwatch', () => void socket.leave(LOBBY_WATCHERS));
+  on('lobbies:unwatch', () => void socket.leave(LOBBY_WATCHERS));
 
-  socket.on('game:start', (ack) => inRoom(socket, ack, (room, id) => rooms.start(room, id)));
-  socket.on('game:attack', ({ card }, ack) => inRoom(socket, ack, (room, id) => requireGame(room).attack(id, card)));
-  socket.on('game:defend', ({ attackIndex, card }, ack) =>
-    inRoom(socket, ack, (room, id) => requireGame(room).defend(id, attackIndex, card)),
+  /** Spielzug: ack ist immer das letzte Argument */
+  const move = (ack: unknown, action: (room: Room, id: string) => void) =>
+    inRoom(socket, ack as (r: Result) => void, action);
+
+  on('game:start', (ack) => move(ack, (room, id) => rooms.start(room, id)));
+  on('game:attack', (raw, ack) => move(ack, (room, id) => requireGame(room).attack(id, cardOf(obj(raw).card))));
+  on('game:defend', (raw, ack) =>
+    move(ack, (room, id) => {
+      const p = obj(raw);
+      requireGame(room).defend(id, Number(p.attackIndex), cardOf(p.card));
+    }),
   );
-  socket.on('game:transfer', ({ card }, ack) =>
-    inRoom(socket, ack, (room, id) => requireGame(room).transfer(id, card)),
-  );
-  socket.on('game:take', (ack) => inRoom(socket, ack, (room, id) => requireGame(room).take(id)));
-  socket.on('game:pass', (ack) => inRoom(socket, ack, (room, id) => requireGame(room).pass(id)));
-  socket.on('game:kick', ({ playerId: target }, ack) =>
-    inRoom(socket, ack, (room, id) => rooms.kick(room, id, String(target ?? ''))),
-  );
+  on('game:transfer', (raw, ack) => move(ack, (room, id) => requireGame(room).transfer(id, cardOf(obj(raw).card))));
+  on('game:take', (ack) => move(ack, (room, id) => requireGame(room).take(id)));
+  on('game:pass', (ack) => move(ack, (room, id) => requireGame(room).pass(id)));
+  on('game:kick', (raw, ack) => move(ack, (room, id) => rooms.kick(room, id, String(obj(raw).playerId ?? ''))));
 
   /** Chat und Werfen: im aktuellen Raum, ohne den Spielstand neu zu senden */
-  const social = (ack: (r: Result) => void, limit: RateLimiter, action: (room: Room, playerId: string) => void) => {
+  const social = (ack: unknown, limit: RateLimiter, action: (room: Room, playerId: string) => void) => {
     if (typeof ack !== 'function') return;
-    const { roomCode, playerId } = socket.data;
-    const room = roomCode ? rooms.get(roomCode) : undefined;
+    const room = currentRoom(socket);
+    const playerId = socket.data.playerId;
     if (!room || !playerId) return ack({ ok: false, error: 'Du bist in keinem Raum' });
     if (!limit.take(playerId)) {
       stats.limited();
@@ -248,15 +313,16 @@ io.on('connection', (socket: IoSocket) => {
     }
   };
 
-  socket.on('chat:send', (p, ack) =>
+  on('chat:send', (raw, ack) =>
     social(ack, chatLimit, (room, id) => {
-      toRoom(room, 'chat', rooms.chat(room, id, p?.text));
+      toRoom(room, 'chat', rooms.chat(room, id, obj(raw).text));
       stats.chat();
     }),
   );
-  socket.on('throw', (p, ack) =>
+  on('throw', (raw, ack) =>
     social(ack, throwLimit, (room, id) => {
-      toRoom(room, 'throw', rooms.throwAt(room, id, p?.to, p?.item));
+      const p = obj(raw);
+      toRoom(room, 'throw', rooms.throwAt(room, id, p.to, p.item));
       stats.thrown();
     }),
   );
@@ -302,6 +368,7 @@ setInterval(() => {
   joinLimit.prune();
   chatLimit.prune();
   throwLimit.prune();
+  actionLimit.prune();
   const { online, games } = liveCounts();
   stats.observe(online, games);
 }, 10_000).unref();
