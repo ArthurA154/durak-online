@@ -199,6 +199,31 @@ body {
   box-shadow: inset 0 0 0 2px var(--yellow);
 }
 
+/* Kartenrücken wählen */
+.back-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.back-tile {
+  display: grid;
+  place-items: center;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.back-tile.on {
+  box-shadow: inset 0 0 0 2px var(--yellow);
+}
+
+.back-tile .card {
+  --cw: 34px;
+}
+
 .theme-preview {
   position: relative;
   height: 58px;
@@ -893,8 +918,51 @@ input:focus {
 }
 
 .me-preview {
-  width: 72px;
-  height: 72px;
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  margin-top: 18px;
+}
+
+/* Figur-Editor: Augen, Mund, Accessoire */
+.look-editor {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.look-row {
+  display: grid;
+  grid-template-columns: 1fr 32px minmax(110px, auto) 32px;
+  align-items: center;
+  gap: 6px;
+}
+
+.look-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.look-value {
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.look-arrow {
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.look-arrow:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .swatches {
@@ -1359,10 +1427,11 @@ input:focus {
 
 /* Rückseite */
 .card.back {
-  background-color: #2b3a8f;
-  background-image: radial-gradient(circle at 50% 50%, rgba(255, 210, 63, 0.9) 0 1.5px, transparent 2px),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 7px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 7px);
+  /* Design kommt aus cardBack.ts (jeder wählt für sich) */
+  background-color: var(--back, #2b3a8f);
+  background-image: radial-gradient(circle at 50% 50%, var(--back-dot) 0 1.5px, transparent 2px),
+    repeating-linear-gradient(45deg, var(--back-line) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, var(--back-line) 0 2px, transparent 2px 7px);
   background-size:
     12px 12px,
     auto,
@@ -1421,7 +1490,7 @@ input:focus {
 .deck-stack .card.back {
   box-shadow:
     1px 1px 0 #ddd,
-    2px 2px 0 #2b3a8f,
+    2px 2px 0 var(--back, #2b3a8f),
     3px 3px 0 #ddd,
     0 6px 12px rgba(0, 0, 0, 0.4);
 }

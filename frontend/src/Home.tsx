@@ -1,14 +1,27 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
-import { AVATAR_COLORS, MAX_PLAYERS, type Card, type OpenLobby, type Result, type Session } from '@durak/shared';
+import {
+  AVATAR_COLORS,
+  LOOK_EYES,
+  LOOK_HATS,
+  LOOK_MOUTHS,
+  MAX_PLAYERS,
+  cleanLook,
+  type Card,
+  type Look,
+  type OpenLobby,
+  type Result,
+  type Session,
+} from '@durak/shared';
 import { call, saveSession, socket } from './socket';
 import { CardFace } from './CardView';
 import { Avatar } from './Avatar';
 import { Segmented } from './Segmented';
 import { FooterLinks } from './Privacy';
-import { t } from './i18n';
+import { t, type Key } from './i18n';
 
 const NAME_KEY = 'durak.name';
 const COLOR_KEY = 'durak.color';
+const LOOK_KEY = 'durak.look';
 const HERO_CARDS: Card[] = [
   { rank: 11, suit: 'S' },
   { rank: 12, suit: 'H' },
@@ -24,6 +37,41 @@ function initialColor(): number {
     /* egal */
   }
   return Math.floor(Math.random() * AVATAR_COLORS.length);
+}
+
+function initialLook(): Look {
+  try {
+    return cleanLook(JSON.parse(localStorage.getItem(LOOK_KEY) ?? 'null'));
+  } catch {
+    return cleanLook(null);
+  }
+}
+
+/** Eine Zeile im Figur-Editor: ◀ Name ▶ */
+function LookRow(props: { label: string; names: readonly string[]; value: number; onChange: (v: number) => void }) {
+  const n = props.names.length;
+  return (
+    <div className="look-row">
+      <span className="look-label">{props.label}</span>
+      <button
+        type="button"
+        className="look-arrow"
+        aria-label={`${props.label} ◀`}
+        onClick={() => props.onChange((props.value + n - 1) % n)}
+      >
+        ◀
+      </button>
+      <span className="look-value">{props.names[props.value]}</span>
+      <button
+        type="button"
+        className="look-arrow"
+        aria-label={`${props.label} ▶`}
+        onClick={() => props.onChange((props.value + 1) % n)}
+      >
+        ▶
+      </button>
+    </div>
+  );
 }
 
 function initialName(): string {
@@ -54,6 +102,7 @@ function useOpenLobbies(): OpenLobby[] {
 export function Home({ message = '' }: { message?: string }) {
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
+  const [look, setLook] = useState(initialLook);
   const [code, setCode] = useState(() => (new URLSearchParams(location.search).get('raum') ?? '').toUpperCase());
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,6 +116,7 @@ export function Home({ message = '' }: { message?: string }) {
     try {
       localStorage.setItem(NAME_KEY, name);
       localStorage.setItem(COLOR_KEY, String(color));
+      localStorage.setItem(LOOK_KEY, JSON.stringify(look));
     } catch {
       /* egal */
     }
@@ -82,14 +132,14 @@ export function Home({ message = '' }: { message?: string }) {
 
   const create = (e: FormEvent) => {
     e.preventDefault();
-    run((ack) => socket.emit('room:create', { name, color, public: isPublic }, ack));
+    run((ack) => socket.emit('room:create', { name, color, look, public: isPublic }, ack));
   };
 
-  const joinOpen = (roomCode: string) => run((ack) => socket.emit('room:join', { roomCode, name, color }, ack));
+  const joinOpen = (roomCode: string) => run((ack) => socket.emit('room:join', { roomCode, name, color, look }, ack));
 
   const join = (e: FormEvent) => {
     e.preventDefault();
-    run((ack) => socket.emit('room:join', { roomCode: code.trim().toUpperCase(), name, color }, ack));
+    run((ack) => socket.emit('room:join', { roomCode: code.trim().toUpperCase(), name, color, look }, ack));
   };
 
   return (
@@ -109,7 +159,7 @@ export function Home({ message = '' }: { message?: string }) {
         <div className="panel">
           <div className="me-editor">
             <div className="me-preview">
-              <Avatar color={color} expression={name.trim() ? 'happy' : 'neutral'} seed="preview" />
+              <Avatar color={color} look={look} expression={name.trim() ? 'happy' : 'neutral'} seed="preview" />
             </div>
             <label className="field">
               <span>{t('yourName')}</span>
@@ -129,6 +179,27 @@ export function Home({ message = '' }: { message?: string }) {
                 onClick={() => setColor(i)}
               />
             ))}
+          </div>
+
+          <div className="look-editor">
+            <LookRow
+              label={t('lookEyes')}
+              names={LOOK_EYES.map((k) => t(`eyes.${k}` as Key))}
+              value={look.eyes}
+              onChange={(eyes) => setLook({ ...look, eyes })}
+            />
+            <LookRow
+              label={t('lookMouth')}
+              names={LOOK_MOUTHS.map((k) => t(`mouth.${k}` as Key))}
+              value={look.mouth}
+              onChange={(mouth) => setLook({ ...look, mouth })}
+            />
+            <LookRow
+              label={t('lookHat')}
+              names={LOOK_HATS.map((k) => t(`hat.${k}` as Key))}
+              value={look.hat}
+              onChange={(hat) => setLook({ ...look, hat })}
+            />
           </div>
 
           <div className="panel-actions">
@@ -177,7 +248,7 @@ export function Home({ message = '' }: { message?: string }) {
               {lobbies.map((l) => (
                 <li key={l.code}>
                   <span className="avatar small">
-                    <Avatar color={l.color} expression="happy" seed={l.code} />
+                    <Avatar color={l.color} look={l.look} expression="happy" seed={l.code} />
                   </span>
                   <span className="open-info">
                     <b>{l.host}</b>

@@ -33,6 +33,59 @@ export const THROW_IN_MS = 4_000;
 /** Wer so lange getrennt ist, darf von den anderen aus dem Raum entfernt werden (bzw. fliegt aus der Lobby). */
 export const AWAY_KICK_MS = 60_000;
 
+/** Aussehen der Figur (neben der Farbe): Augen, Mund, Accessoire – je ein Index in die Listen */
+export const LOOK_EYES = [
+  'dots',
+  'sleepy',
+  'wink',
+  'glasses',
+  'sunglasses',
+  'angry',
+  'hearts',
+  'stars',
+  'eyepatch',
+  'monocle',
+  'visor',
+] as const;
+export const LOOK_MOUTHS = ['plain', 'grin', 'tongue', 'fangs', 'cigar', 'pipe', 'bubblegum', 'handlebar'] as const;
+export const LOOK_HATS = [
+  'none',
+  'ushanka',
+  'tophat',
+  'crown',
+  'headphones',
+  'kerchief',
+  'cap',
+  'cowboy',
+  'pirate',
+  'beanie',
+  'viking',
+  'wizard',
+  'halo',
+  'horns',
+  'party',
+] as const;
+
+export interface Look {
+  eyes: number;
+  mouth: number;
+  hat: number;
+}
+
+export const DEFAULT_LOOK: Look = { eyes: 0, mouth: 0, hat: 0 };
+
+/** Aussehen vom Client prüfen – Unbekanntes wird zu „normal“ */
+export function cleanLook(raw: unknown): Look {
+  const r = (raw ?? {}) as Partial<Record<keyof Look, unknown>>;
+  const pick = (v: unknown, n: number) =>
+    Number.isInteger(v) && (v as number) >= 0 && (v as number) < n ? (v as number) : 0;
+  return {
+    eyes: pick(r.eyes, LOOK_EYES.length),
+    mouth: pick(r.mouth, LOOK_MOUTHS.length),
+    hat: pick(r.hat, LOOK_HATS.length),
+  };
+}
+
 /** Farben für die Figuren (Index wird übertragen) */
 export const AVATAR_COLORS = [
   '#ff6b6b',
@@ -90,6 +143,7 @@ export interface OpenLobby {
   host: string;
   /** Index in AVATAR_COLORS */
   color: number;
+  look: Look;
   players: number;
   neighborsOnly: boolean;
   unlimited: boolean;
@@ -105,6 +159,7 @@ export interface PlayerView {
   out: boolean;
   /** Index in AVATAR_COLORS */
   color: number;
+  look: Look;
   /** Wie oft schon Durak in diesem Raum */
   durakCount: number;
   /** Getrennt seit … ms (beim Senden); null = verbunden */
@@ -192,8 +247,14 @@ export interface ThrowEvent {
 }
 
 export interface ClientToServerEvents {
-  'room:create': (p: { name: string; color: number; public?: boolean }, ack: (r: Result<Session>) => void) => void;
-  'room:join': (p: { roomCode: string; name: string; color: number }, ack: (r: Result<Session>) => void) => void;
+  'room:create': (
+    p: { name: string; color: number; look?: Look; public?: boolean },
+    ack: (r: Result<Session>) => void,
+  ) => void;
+  'room:join': (
+    p: { roomCode: string; name: string; color: number; look?: Look },
+    ack: (r: Result<Session>) => void,
+  ) => void;
   'room:rejoin': (p: { roomCode: string; token: string }, ack: (r: Result<Session>) => void) => void;
   'room:leave': () => void;
   /** Gastgeber: Einstellungen ändern (nicht während einer Partie) */

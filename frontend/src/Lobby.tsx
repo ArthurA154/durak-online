@@ -64,6 +64,7 @@ export function Lobby({ view }: { view: GameView }) {
               id={p.id}
               name={p.name}
               color={p.color}
+              look={p.look}
               expression="happy"
               hat={p.id === view.lastDurakId}
               offline={!p.connected}

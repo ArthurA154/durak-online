@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { CardBack } from './CardView';
+import type { Look } from '@durak/shared';
 import { Avatar, type Expression } from './Avatar';
 import { t } from './i18n';
 
@@ -18,6 +19,7 @@ interface Props {
   id?: string;
   name?: string;
   color?: number;
+  look?: Look;
   expression?: Expression;
   hat?: boolean;
   /** Leerer Stuhl (Lobby) */
@@ -38,7 +40,7 @@ interface Props {
 
 /** Ein Platz am Tisch mit Figur, Name, Kartenfächer und Status. */
 export function Seat(props: Props) {
-  const { pos, id, name = '', color = 0, expression, hat, empty, role, done, offline, out } = props;
+  const { pos, id, name = '', color = 0, look, expression, hat, empty, role, done, offline, out } = props;
   const { cardCount, note, countdown, taking } = props;
   const classes = [
     'seat',
@@ -63,7 +65,7 @@ export function Seat(props: Props) {
         </div>
       )}
       <div className="avatar">
-        {!empty && <Avatar color={color} expression={expression} hat={hat} seed={id ?? name} />}
+        {!empty && <Avatar color={color} look={look} expression={expression} hat={hat} seed={id ?? name} />}
         {countdown && (
           <>
             <span className="timer-ring" style={{ '--p': countdown.fraction } as CSSProperties} />

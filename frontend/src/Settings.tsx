@@ -6,6 +6,7 @@ import { LANG_NAMES, getLang, setLang, t } from './i18n';
 import { Segmented } from './Segmented';
 import { FooterLinks } from './Privacy';
 import { setHandSort, useHandSort, type HandSort } from './handSort';
+import { CARD_BACKS, backVars, setCardBack, useCardBack } from './cardBack';
 
 const GearIcon = () => (
   <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
@@ -22,6 +23,7 @@ const GearIcon = () => (
 /** ⚙️ in der Kopfleiste: Sprache, Lautstärke, Hintergrund – alles nur für dieses Gerät. */
 export function Settings() {
   const { mode } = useHandSort();
+  const back = useCardBack();
   return (
     <Popover icon={<GearIcon />} label={t('settings')} className="settings-panel">
       <section className="settings-section">
@@ -48,6 +50,24 @@ export function Settings() {
       <section className="settings-section">
         <h3>{t('volume')}</h3>
         <VolumeSliders />
+      </section>
+      <section className="settings-section">
+        <h3>{t('cardBack')}</h3>
+        <div className="back-grid" role="radiogroup" aria-label={t('cardBack')}>
+          {CARD_BACKS.map((b, i) => (
+            <button
+              key={b.id}
+              type="button"
+              role="radio"
+              aria-checked={b.id === back}
+              aria-label={t('cardBackN', { n: i + 1 })}
+              className={`back-tile${b.id === back ? ' on' : ''}`}
+              onClick={() => setCardBack(b.id)}
+            >
+              <span className="card back" style={backVars(b)} />
+            </button>
+          ))}
+        </div>
       </section>
       <section className="settings-section">
         <h3>{t('background')}</h3>

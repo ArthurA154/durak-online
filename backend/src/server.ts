@@ -197,7 +197,14 @@ io.on('connection', (socket: IoSocket) => {
       return ack({ ok: false, error: 'Zu viele neue Räume – warte kurz' });
     }
     try {
-      const { room, session } = rooms.create(String(p.name ?? ''), Number(p.color), socket.id, p.public === true, ip);
+      const { room, session } = rooms.create(
+        String(p.name ?? ''),
+        Number(p.color),
+        socket.id,
+        p.public === true,
+        ip,
+        p.look,
+      );
       ack({ ok: true, ...session });
       enter(room, session.playerId);
     } catch (err) {
@@ -219,6 +226,7 @@ io.on('connection', (socket: IoSocket) => {
         Number(p.color),
         socket.id,
         ip,
+        p.look,
       );
       ack({ ok: true, ...session });
       enter(room, session.playerId);

@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AVATAR_COLORS,
+  cleanLook,
+  type Look,
   AWAY_KICK_MS,
   CHAT_KEEP,
   CHAT_MAX,
@@ -30,6 +32,7 @@ export interface RoomPlayer {
   /** Seit wann getrennt (für Pause / Entfernen) */
   awaySince: number | null;
   color: number;
+  look: Look;
   durakCount: number;
   /** Adresse – nur im Speicher, damit Rausgeworfene nicht gleich wieder reinkommen */
   ip: string;
@@ -105,13 +108,20 @@ export class RoomManager {
     return this.rooms.size;
   }
 
-  create(name: string, color: number, socketId: string, isPublic = false, ip = ''): { room: Room; session: Session } {
+  create(
+    name: string,
+    color: number,
+    socketId: string,
+    isPublic = false,
+    ip = '',
+    look?: unknown,
+  ): { room: Room; session: Session } {
     let code: string;
     do {
       code = Array.from(randomBytes(5), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
     } while (this.rooms.has(code));
 
-    const player = newPlayer(name, color, socketId, ip);
+    const player = newPlayer(name, color, socketId, ip, look);
     const room: Room = {
       code,
       hostId: player.id,
@@ -144,14 +154,21 @@ export class RoomManager {
     return { room, session: sessionOf(room, player) };
   }
 
-  join(code: string, name: string, color: number, socketId: string, ip = ''): { room: Room; session: Session } {
+  join(
+    code: string,
+    name: string,
+    color: number,
+    socketId: string,
+    ip = '',
+    look?: unknown,
+  ): { room: Room; session: Session } {
     const room = this.get(code);
     if (!room) throw new GameError('Raum nicht gefunden');
     if (ip && room.banned.has(ip)) throw new GameError('Der Gastgeber hat dich aus diesem Raum entfernt');
     if (isRunning(room)) throw new GameError('Das Spiel läuft bereits');
     if (room.players.length >= MAX_PLAYERS) throw new GameError('Der Raum ist voll');
 
-    const player = newPlayer(name, color, socketId, ip);
+    const player = newPlayer(name, color, socketId, ip, look);
     room.players.push(player);
     room.emptySince = null;
     return { room, session: sessionOf(room, player) };
@@ -234,6 +251,7 @@ export class RoomManager {
         code: room.code,
         host: host.name,
         color: host.color,
+        look: host.look,
         players: room.players.length,
         neighborsOnly: room.settings.neighborsOnly,
         unlimited: room.settings.unlimited,
@@ -411,6 +429,7 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
         connected: p.socketId !== null,
         out: !!g && !!gp && g.isOut(gp),
         color: p.color,
+        look: p.look,
         durakCount: p.durakCount,
         awayMs: !p.socketId && p.awaySince ? now - p.awaySince : null,
       };
@@ -447,7 +466,7 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
   };
 }
 
-function newPlayer(name: string, color: number, socketId: string, ip: string): RoomPlayer {
+function newPlayer(name: string, color: number, socketId: string, ip: string, look?: unknown): RoomPlayer {
   const clean = name.trim().slice(0, 20);
   if (!clean) throw new GameError('Bitte einen Namen eingeben');
   const validColor = Number.isInteger(color) && color >= 0 && color < AVATAR_COLORS.length ? color : 0;
@@ -458,6 +477,7 @@ function newPlayer(name: string, color: number, socketId: string, ip: string): R
     socketId,
     awaySince: null,
     color: validColor,
+    look: cleanLook(look),
     durakCount: 0,
     ip,
   };

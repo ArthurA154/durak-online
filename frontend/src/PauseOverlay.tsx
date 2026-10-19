@@ -30,7 +30,7 @@ export function PauseOverlay({ view }: { view: GameView }) {
         return (
           <div key={p.id} className="pause-row">
             <span className="avatar small">
-              <Avatar color={p.color} expression="neutral" seed={p.id} />
+              <Avatar color={p.color} look={p.look} expression="neutral" seed={p.id} />
             </span>
             <span className="pause-who">{t('nameSmokeBreak', { name: p.name })}</span>
             {left > 0 ? (

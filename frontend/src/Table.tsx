@@ -584,6 +584,7 @@ export function Table({ view }: { view: GameView }) {
             id={p.id}
             name={p.name}
             color={p.color}
+            look={p.look}
             expression={expressionFor(view, p.id)}
             hat={p.id === view.lastDurakId}
             role={p.id === view.attackerId ? 'attacker' : p.id === view.defenderId ? 'defender' : null}
@@ -621,6 +622,7 @@ export function Table({ view }: { view: GameView }) {
             <span className="avatar small">
               <Avatar
                 color={meInfo?.color ?? 0}
+                look={meInfo?.look}
                 expression={expressionFor(view, me)}
                 hat={me === view.lastDurakId}
                 seed={me}

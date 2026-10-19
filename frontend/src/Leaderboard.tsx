@@ -47,7 +47,7 @@ export function Leaderboard({ view }: { view: GameView }) {
           {ranking.map((p) => (
             <li key={p.id} className={p.id === view.you ? 'is-me' : undefined}>
               <span className="avatar tiny">
-                <Avatar color={p.color} hat={p.id === view.lastDurakId} seed={p.id} />
+                <Avatar color={p.color} look={p.look} hat={p.id === view.lastDurakId} seed={p.id} />
               </span>
               <span className="leaderboard-name">{p.name}</span>
               <span className="leaderboard-count">{p.durakCount}</span>

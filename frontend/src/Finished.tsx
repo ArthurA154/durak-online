@@ -19,7 +19,7 @@ export function Finished({ view }: { view: GameView }) {
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 14, delay: 0.2 }}
         >
-          <Avatar color={durak.color} expression="sad" hat seed={durak.id} />
+          <Avatar color={durak.color} look={durak.look} expression="sad" hat seed={durak.id} />
         </motion.div>
       )}
       <motion.div
@@ -38,7 +38,7 @@ export function Finished({ view }: { view: GameView }) {
         {ranking.map((p) => (
           <li key={p.id}>
             <span className="avatar small">
-              <Avatar color={p.color} expression={p.id === view.durakId ? 'sad' : 'happy'} seed={p.id} />
+              <Avatar color={p.color} look={p.look} expression={p.id === view.durakId ? 'sad' : 'happy'} seed={p.id} />
             </span>
             <span className="score-name">{p.name}</span>
             <span className="score-count">🃏 {p.durakCount}</span>

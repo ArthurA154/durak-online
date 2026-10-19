@@ -135,6 +135,19 @@ describe('Zug-Timer im Raum', () => {
     }
   });
 
+  it('Aussehen der Figur wird übernommen, Ungültiges wird „normal“', () => {
+    const rooms = new RoomManager();
+    const { room } = rooms.create('Anna', 0, 's1', false, '', { eyes: 2, mouth: 1, hat: 3 });
+    rooms.join(room.code, 'Ben', 1, 's2', '', { eyes: 99, mouth: -1, hat: 'krone' });
+    rooms.join(room.code, 'Cleo', 2, 's3');
+    const v = viewFor(room, room.hostId);
+    expect(v.players.map((p) => p.look)).toEqual([
+      { eyes: 2, mouth: 1, hat: 3 },
+      { eyes: 0, mouth: 0, hat: 0 },
+      { eyes: 0, mouth: 0, hat: 0 },
+    ]);
+  });
+
   it('ungültige Farbe wird auf 0 gesetzt', () => {
     const rooms = new RoomManager();
     const { room } = rooms.create('Anna', 999, 's1');
@@ -256,7 +269,16 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const pub = rooms.create('Anna', 0, 's1', true).room;
     rooms.create('Privat', 1, 's2');
     expect(rooms.openLobbies()).toEqual([
-      { code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false, transfer: true },
+      {
+        code: pub.code,
+        host: 'Anna',
+        color: 0,
+        look: { eyes: 0, mouth: 0, hat: 0 },
+        players: 1,
+        neighborsOnly: false,
+        unlimited: false,
+        transfer: true,
+      },
     ]);
     const b = rooms.join(pub.code, 'Ben', 1, 's3').session;
     rooms.start(pub, pub.hostId);
