@@ -25,6 +25,7 @@
   --cw: var(--base-cw);
   --ch: calc(var(--cw) * 1.42);
   --mini-w: 34px;
+  --av: 58px;
 
   font-family: var(--body);
   color: var(--text);
@@ -82,24 +83,8 @@ body {
   }
 }
 
-.scene .train-far {
-  animation: drive 60s linear infinite;
-}
-
-.scene .train-near {
-  animation: drive 22s linear infinite;
-}
-
-@keyframes drive {
-  to {
-    transform: translateX(-1600px);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .scene .twinkle,
-  .scene .train-far,
-  .scene .train-near {
+  .scene .twinkle {
     animation: none;
   }
 }
@@ -141,13 +126,6 @@ body {
     0 24px 60px 10px rgba(0, 0, 0, 0.55);
 }
 
-[data-theme='train'] .felt {
-  background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.25), transparent 70%),
-    radial-gradient(circle at 85% 30%, #b98a3a 0 20px, #d9dde2 20px 27px, transparent 28px),
-    radial-gradient(circle at 85% 30%, rgba(0, 0, 0, 0.18) 0 34px, transparent 35px),
-    radial-gradient(ellipse at center, var(--felt) 40%, var(--felt-edge) 100%);
-}
-
 [data-theme='kitchen'] .felt {
   background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%),
     repeating-linear-gradient(0deg, rgba(196, 60, 52, 0.22) 0 26px, transparent 26px 52px),
@@ -174,8 +152,6 @@ body {
 }
 
 /* Helle oder bunte Tische: Namen und Status der Spieler auf dunklem Grund, damit lesbar */
-[data-theme='train'] .seat-name,
-[data-theme='train'] .seat-note,
 [data-theme='kitchen'] .seat-name,
 [data-theme='kitchen'] .seat-note,
 [data-theme='beach'] .seat-name,
@@ -186,7 +162,6 @@ body {
 }
 
 /* Helle Tische: Text auf dem Tisch dunkel */
-[data-theme='train'] .mini-felt-text,
 [data-theme='kitchen'] .mini-felt-text {
   color: rgba(0, 0, 0, 0.35);
 }
@@ -267,10 +242,6 @@ body {
 .theme-preview[data-preview='pub'] i {
   background: repeating-linear-gradient(93deg, transparent 0 5px, rgba(0, 0, 0, 0.2) 5px 6px),
     radial-gradient(ellipse at center, var(--p-felt) 35%, var(--p-edge));
-}
-
-.theme-preview[data-preview='train'] {
-  background: linear-gradient(#1d2b4f, #c86a4a 70%, #1f2b28 71%);
 }
 
 .theme-preview[data-preview='space'] i {
@@ -428,6 +399,12 @@ body {
   overscroll-behavior: contain;
   display: grid;
   gap: 18px;
+}
+
+.settings-hint {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
 }
 
 .settings-section h3 {
@@ -824,24 +801,28 @@ input:focus {
   translate: -50% 0;
 }
 
+/* Links/rechts: Mitte der Figur auf Höhe der Tischmitte – egal ob darunter noch „greift an“ steht.
+   --felt-shift = wie weit die Tischmitte unter der Mitte der Arena liegt (oberer minus unterer Abstand, halbiert). */
+.pos-left,
+.pos-right {
+  top: calc(50% + var(--felt-shift, 0px));
+  translate: 0 calc(var(--av) / -2);
+}
+
 .pos-left {
   left: 0;
-  top: 50%;
-  translate: 0 -50%;
 }
 
 .pos-right {
   right: 0;
-  top: 50%;
-  translate: 0 -50%;
 }
 
 .avatar {
   position: relative;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: var(--av);
+  height: var(--av);
   border-radius: 50%;
   box-shadow:
     0 0 0 4px var(--room),
@@ -968,6 +949,32 @@ input:focus {
     0 6px 14px rgba(0, 0, 0, 0.45);
 }
 
+/* Aura um den Verteidiger: rotes Leuchten hinter der Figur, atmet langsam */
+.seat.is-defender .avatar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 calc(var(--av) * 0.35) calc(var(--av) * 0.16) rgba(255, 81, 72, 0.85),
+    0 0 calc(var(--av) * 0.9) calc(var(--av) * 0.3) rgba(255, 81, 72, 0.4);
+  pointer-events: none;
+  animation: aura 2.8s ease-in-out infinite;
+}
+
+@keyframes aura {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat.is-defender .avatar::before {
+    animation: none;
+  }
+}
+
 @keyframes pulse {
   50% {
     box-shadow:
@@ -1078,12 +1085,76 @@ input:focus {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
+/* Rollen als deutliche Plaketten: wer greift an, wer verteidigt */
+.seat.is-attacker .seat-note,
+.seat.is-defender .seat-note {
+  margin-top: 0;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
 .seat.is-attacker .seat-note {
-  color: var(--yellow);
+  background: var(--yellow);
+  color: #2a2100;
 }
 
 .seat.is-defender .seat-note {
+  background: var(--red);
+  color: #fff;
+}
+
+/* Pfeil Angreifer → Verteidiger, unter den Karten */
+.attack-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.attack-arrow-shape {
+  animation: arrow-in 0.35s ease-out both;
+}
+
+.attack-arrow path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.attack-arrow-shadow {
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 11;
+}
+
+.attack-arrow-line {
+  stroke-width: 6;
+}
+
+.attack-arrow polygon {
+  fill: var(--red);
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+@keyframes arrow-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Ich muss verteidigen: Hinweis groß und rot, rote Linie über der Hand */
+.me.must-defend .turn-text {
   color: var(--red);
+  font-size: 1.15rem;
+}
+
+.me.must-defend .hand {
+  background: linear-gradient(to bottom, rgba(255, 81, 72, 0.16), transparent 70%);
+  box-shadow: inset 0 3px 0 rgba(255, 81, 72, 0.75);
+  border-radius: 24px 24px 0 0;
 }
 
 .seat.is-offline,
@@ -1188,95 +1259,102 @@ input:focus {
   color: var(--black-suit);
 }
 
+/* Große Ecke: in der Hand sieht man oft nur ~30 % der Karte, auf dem Tisch nur den Rand der Angriffskarte */
 .corner {
   position: absolute;
   display: grid;
   justify-items: center;
-  line-height: 0.95;
+  width: calc(var(--cw) * 0.32);
+  font-weight: 800;
+  line-height: 1;
 }
 
 .corner b {
-  font-weight: 900;
-  font-size: calc(var(--cw) * 0.26);
-  letter-spacing: -0.05em;
+  display: block;
+  font-size: calc(var(--cw) * 0.4);
+  letter-spacing: -0.03em;
 }
 
-.corner i {
-  font-style: normal;
-  font-size: calc(var(--cw) * 0.2);
+/* „10“ etwas schmaler, damit es in den sichtbaren Streifen passt */
+.corner b.ten {
+  letter-spacing: -0.09em;
+  transform: scaleX(0.84);
+  margin-left: -0.06em;
+}
+
+.card .suit {
+  display: block;
+  fill: currentColor;
+}
+
+.corner .suit {
+  width: calc(var(--cw) * 0.27);
+  height: calc(var(--cw) * 0.27);
+  margin-top: calc(var(--cw) * 0.02);
 }
 
 .corner.tl {
-  top: 5%;
-  left: 6%;
+  top: calc(var(--cw) * 0.04);
+  left: calc(var(--cw) * 0.02);
 }
 
 .corner.br {
-  bottom: 5%;
-  right: 6%;
+  bottom: calc(var(--cw) * 0.04);
+  right: calc(var(--cw) * 0.02);
   transform: rotate(180deg);
 }
 
-.pips {
+.pip-center {
   position: absolute;
-  inset: 13% 20%;
-}
-
-.pips i {
-  position: absolute;
-  font-style: normal;
-  font-size: calc(var(--cw) * 0.24);
-  line-height: 1;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--cw) * 0.34);
+  height: calc(var(--cw) * 0.34);
   transform: translate(-50%, -50%);
 }
 
-.pips i.flip {
-  transform: translate(-50%, -50%) rotate(180deg);
-}
-
-.pip-ace {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: calc(var(--cw) * 0.6);
-}
-
+/* Bube, Dame, König: kleines Feld in Kartenfarbe */
 .court {
   position: absolute;
-  inset: 18% 20%;
+  inset: 34% 32%;
   display: grid;
   place-items: center;
-  align-content: center;
   border-radius: calc(var(--cw) * 0.06);
   background: currentColor;
 }
 
-.court b {
-  font-family: var(--display);
-  font-weight: 900;
-  font-size: calc(var(--cw) * 0.36);
-  line-height: 1;
-  color: var(--card);
+.court .suit {
+  width: calc(var(--cw) * 0.22);
+  height: calc(var(--cw) * 0.22);
+  fill: var(--card);
 }
 
-.court i {
-  font-style: normal;
-  font-size: calc(var(--cw) * 0.18);
-  color: var(--card);
-}
-
+/* Kleine Karte (Trumpf): Wert oben links, großes Symbol */
 .card.mini {
   --cw: var(--mini-w);
 }
 
+.card.mini .corner.tl {
+  top: calc(var(--cw) * 0.06);
+  left: calc(var(--cw) * 0.08);
+  width: auto;
+}
+
+.card.mini .corner b {
+  font-size: calc(var(--cw) * 0.44);
+}
+
+.card.mini .corner .suit {
+  display: none;
+}
+
 .pip-big {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding-top: 22%;
-  font-size: calc(var(--cw) * 0.5);
+  left: 50%;
+  bottom: 9%;
+  width: calc(var(--cw) * 0.58);
+  height: calc(var(--cw) * 0.58);
+  transform: translateX(-50%);
 }
 
 /* Rückseite */
@@ -1303,6 +1381,7 @@ input:focus {
 }
 
 .arena {
+  --felt-shift: 24px;
   position: relative;
   flex: 1;
   min-height: 330px;
@@ -1370,12 +1449,17 @@ input:focus {
   border-radius: 50%;
   background: var(--card);
   color: var(--black-suit);
-  font-size: 1.5rem;
   box-shadow: 0 0 0 3px var(--yellow);
 }
 
 .trump-only.red {
   color: var(--red-suit);
+}
+
+.trump-only .suit {
+  width: 58%;
+  height: 58%;
+  fill: currentColor;
 }
 
 .play-area {
@@ -1702,11 +1786,16 @@ input:focus {
   border-radius: calc(var(--cw) * 0.1);
 }
 
-.hand-card.playable {
+/* Beim Umsortieren rücken die Karten weich zur Seite (nur währenddessen – sonst doppelte Bewegung) */
+.hand.sorting .hand-slot {
+  transition: transform 0.16s ease-out;
+}
+
+.hand-card {
   cursor: grab;
 }
 
-.hand-card.playable:active {
+.hand-card:active {
   cursor: grabbing;
 }
 
@@ -1750,9 +1839,12 @@ input:focus {
   }
 
   .avatar {
-    width: 42px;
-    height: 42px;
+    --av: 42px;
     font-size: 1rem;
+  }
+
+  .arena {
+    --felt-shift: 25px;
   }
 
   .seat-name {
@@ -1801,7 +1893,6 @@ input:focus {
     left: 70px;
     width: 30px;
     height: 30px;
-    font-size: 1.1rem;
   }
 
   .discard {
@@ -2871,5 +2962,138 @@ input:focus {
   .actions .btn {
     padding: 9px 12px;
     font-size: 0.85rem;
+  }
+}
+
+/* Großer Bildschirm (PC): Tisch, Karten und Figuren größer, weniger leerer Hintergrund.
+   Breite hängt auch an der Höhe, damit der Tisch nicht zu lang gezogen wird. */
+@media (min-width: 1280px) and (min-height: 760px) {
+  :root {
+    --base-cw: clamp(84px, min(5.8vw, 11.5vh), 116px);
+    --mini-w: 42px;
+    --av: 72px;
+    /* Tischbreite: wächst mit dem Bildschirm, aber höchstens doppelt so breit wie die freie Höhe (nicht zu lang gezogen) */
+    --arena-w: min(1440px, 100vw, max(1100px, calc((100dvh - 330px) * 2)));
+  }
+
+  .arena,
+  .me {
+    width: var(--arena-w);
+  }
+
+  .arena {
+    --felt-shift: 33px;
+  }
+
+  .arena > .felt {
+    inset: 98px 110px 32px;
+    grid-template-columns: 190px 1fr 170px;
+  }
+
+  .play-area {
+    --cw: clamp(40px, min(var(--base-cw), calc((100dvh - 460px) / 1.9)), 110px);
+  }
+
+  .play-area.two-rows {
+    --cw: clamp(38px, min(calc(var(--base-cw) * 0.82), calc((100dvh - 500px) / 3.5)), 92px);
+  }
+
+  /* Viele Paare: Kartengröße aus der echten Breite der Tischmitte (Arena minus Ränder, Stapel, Ablage) */
+  .play-area.many {
+    --cw: clamp(
+      30px,
+      min(
+        calc(var(--base-cw) * 0.8),
+        calc((var(--arena-w) - 680px - (var(--cols) - 1) * 16px) / (var(--cols) * 1.28)),
+        calc((100dvh - 540px) / (var(--rows) * 1.75))
+      ),
+      96px
+    );
+  }
+
+  .seat {
+    width: 140px;
+    gap: 5px;
+  }
+
+  .avatar-badge {
+    min-width: 26px;
+    height: 26px;
+    font-size: 0.85rem;
+  }
+
+  .seat-name {
+    font-size: 1.05rem;
+  }
+
+  .seat-note {
+    font-size: 0.85rem;
+  }
+
+  .pos-top .seat-fan,
+  .pos-top-left .seat-fan,
+  .pos-top-right .seat-fan {
+    top: 126px;
+  }
+
+  .pos-left .seat-fan {
+    left: 96px;
+  }
+
+  .pos-right .seat-fan {
+    right: 96px;
+  }
+
+  .deck {
+    height: 110px;
+    margin-left: 92px;
+  }
+
+  .deck-trump {
+    left: 27px;
+    top: 16px;
+  }
+
+  .trump-only {
+    top: 92px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .me-chip {
+    font-size: 1.05rem;
+  }
+}
+
+/* Sehr große Bildschirme (z. B. 2560 px): noch eine Stufe größer */
+@media (min-width: 2200px) and (min-height: 1100px) {
+  :root {
+    --base-cw: clamp(110px, min(5.6vw, 11.5vh), 140px);
+    --mini-w: 50px;
+    --av: 88px;
+  }
+
+  :root {
+    --arena-w: min(1900px, 100vw, max(1100px, calc((100dvh - 380px) * 2)));
+  }
+
+  .play-area {
+    --cw: clamp(40px, min(var(--base-cw), calc((100dvh - 520px) / 1.9)), 134px);
+  }
+
+  .seat {
+    width: 160px;
+  }
+
+  .seat-name {
+    font-size: 1.2rem;
+  }
+}
+
+/* PC/Laptop: äußere Karten im Fächer liegen tiefer – unten etwas Luft, damit nichts abgeschnitten wird */
+@media (min-width: 701px) {
+  .hand {
+    height: calc(var(--cw) * 1.42 + 78px);
+    padding-bottom: 40px;
   }
 }

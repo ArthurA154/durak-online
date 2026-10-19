@@ -14,7 +14,7 @@ Raum erstellen, Code oder Link an die Freunde schicken, loslegen. Läuft am Hand
 - **Chat** mit Sprechblasen und Schnellsprüchen, dazu Tomaten, Eier, Hausschuhe, Fische und Blumen zum Werfen 🍅
 - **Durak-Zähler** als Rangliste. Die Narrenkappe trägt der Durak der letzten Partie
 - **Pause**, wenn jemand die Verbindung verliert („Raucherpause 🚬“), mit automatischem Wiederverbinden
-- **Acht Hintergründe** von Kneipe über Zugabteil bis Weltraum, Musik und Sounds, Sprachen Deutsch, Englisch und Russisch
+- **Sieben Hintergründe** von Kneipe über Babuschkas Küche bis Weltraum, Musik und Sounds, Sprachen Deutsch, Englisch und Russisch
 
 ## Technik
 

@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { beats, MAX_TABLE, sameCard, type Card, type GameView, type Result } from '@durak/shared';
 import { CardBack, CardFace, cardKey, isRed, suitSymbol } from './CardView';
+import { SuitIcon } from './SuitIcon';
+import { AttackArrow } from './AttackArrow';
+import { setCustomOrder, sortHand, useHandSort } from './handSort';
+import { useTabAlert } from './useTabAlert';
 import { Seat, opponentPositions } from './Seat';
 import { Avatar, type Expression } from './Avatar';
 import { Confetti } from './Confetti';
@@ -47,6 +51,9 @@ export function Table({ view }: { view: GameView }) {
   const [banner, setBanner] = useState('');
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
   const [handW, setHandW] = useState(0);
+  /** Zählt Umsortierungen per Ziehen – danach gleiten die Plätze an die neue Stelle */
+  const [sortVersion, setSortVersion] = useState(0);
+  const handSort = useHandSort();
 
   // Vorheriger Stand – damit Karten wissen, woher sie kommen
   const prevRef = useRef<GameView | null>(null);
@@ -88,6 +95,8 @@ export function Table({ view }: { view: GameView }) {
   const allDefended = view.table.length > 0 && undefended === 0;
   const tableRanks = new Set(view.table.flatMap((t) => [t.attack.rank, t.defense?.rank]));
   const turn = turnInfo(view);
+  // Spiel im Hintergrund-Tab und ich bin dran → Tab-Titel blinkt
+  useTabAlert(turn.mine && !view.paused && !finished, t('tabYourTurn'));
   const countdown = useCountdown(view);
   const timedFor = (id: string) => (countdown?.waitingOn.includes(id) ? countdown : null);
   const myCountdown = timedFor(me);
@@ -261,11 +270,82 @@ export function Table({ view }: { view: GameView }) {
     if (targets.length > 1) setError(t('dragOntoTarget'));
   };
 
-  const active = dragging ?? selected;
+  /** Wird gerade eine Karte zum Ausspielen gezogen (nicht nur zum Umsortieren)? */
+  const playDrag = dragging && usable(dragging) ? dragging : null;
+  const active = playDrag ?? selected;
   // Mit Hilfen: nur passende Ziele markieren. Ohne: alle offenen Karten sind wählbar (verrät nichts)
   const activeTargets = !active || !isDefender ? [] : openTargets(active);
   const activeTransfer = !!active && canTransferWith(active);
-  const tableGlows = !!dragging && (isDefender ? activeTransfer : hints ? canAttackWith(dragging) : myMove);
+  const tableGlows = !!playDrag && (isDefender ? activeTransfer : hints ? canAttackWith(playDrag) : myMove);
+
+  // ---------- Umsortieren in der Hand ----------
+  // Beim Ziehen rücken die anderen Karten zur Seite; beim Loslassen gleitet alles an den neuen Platz.
+
+  /** Positionen der Karten beim Start des Ziehens (ohne die Lücke – sonst springt die Lücke hin und her) */
+  const sortDrag = useRef<{ rects: DOMRect[]; secondRowTop: number | null } | null>(null);
+  /** Wo die gezogene Karte gerade landen würde (Index in der Hand) */
+  const [sortGap, setSortGap] = useState<{ from: number; to: number } | null>(null);
+  /** Mitte jeder Karte direkt vor dem Umsortieren – zum weichen Hingleiten danach */
+  const flipFrom = useRef<Map<string, Point> | null>(null);
+  /** Umsortierte Karte bekommt ein neues Element: kein Zurückfedern von der Maus, nur ein Hingleiten */
+  const sortKeys = useRef(new Map<string, number>());
+  /** Gerade losgelassene Karte bleibt beim Hingleiten obenauf */
+  const [settling, setSettling] = useState<string | null>(null);
+  useEffect(() => {
+    if (!settling) return;
+    const t = setTimeout(() => setSettling(null), 300);
+    return () => clearTimeout(t);
+  }, [settling, sortVersion]);
+
+  const startSortDrag = () => {
+    const el = handRef.current;
+    if (!el) return;
+    const rows = el.querySelectorAll<HTMLElement>('.hand-row');
+    sortDrag.current = {
+      rects: [...el.querySelectorAll<HTMLElement>('.hand-slot')].map((s) => s.getBoundingClientRect()),
+      secondRowTop: rows[1]?.getBoundingClientRect().top ?? null,
+    };
+  };
+
+  /** An welche Stelle käme die Karte, wenn man sie hier loslässt? null = nicht über der Hand */
+  const sortIndex = (card: Card, page: Point): number | null => {
+    const d = sortDrag.current;
+    const el = handRef.current;
+    if (!d || !el) return null;
+    const p = { x: page.x - window.scrollX, y: page.y - window.scrollY };
+    const box = el.getBoundingClientRect();
+    if (p.y < box.top - 20 || p.y > box.bottom + 20) return null;
+    // Bei zwei Reihen: in welcher losgelassen? (die zweite liegt vor der ersten)
+    const row = d.secondRowTop !== null && p.y > d.secondRowTop + 20 ? 1 : 0;
+    const rowOf = (i: number) => (twoRows && i >= half ? 1 : 0);
+    return hand.filter((c, i) => {
+      const r = d.rects[i];
+      if (!r || sameCard(c, card)) return false;
+      return rowOf(i) < row || (rowOf(i) === row && r.left + r.width / 2 < p.x);
+    }).length;
+  };
+
+  const reorder = (card: Card, page: Point) => {
+    const at = sortIndex(card, page);
+    const el = handRef.current;
+    if (at === null || !el) return;
+    const next = hand.filter((c) => !sameCard(c, card));
+    next.splice(at, 0, card);
+    if (next.every((c, i) => sameCard(c, hand[i]))) return;
+    const slots = el.querySelectorAll<HTMLElement>('.hand-slot');
+    // Plätze (inkl. Lücke) merken – danach gleiten sie von dort an die neue Stelle.
+    // Die gezogene Karte: dort, wo sie gerade unter der Maus ist (inkl. Ziehen)
+    flipFrom.current = new Map(
+      hand.flatMap((c, i) => {
+        const el = sameCard(c, card) ? slots[i]?.querySelector('.hand-card') : slots[i];
+        return el ? [[cardKey(c), centerOf(el.getBoundingClientRect())] as const] : [];
+      }),
+    );
+    sortKeys.current.set(cardKey(card), sortVersion + 1);
+    setCustomOrder(next);
+    setSortVersion((v) => v + 1);
+    setSettling(cardKey(card));
+  };
 
   // ---------- Woher kommen neue Karten? ----------
 
@@ -295,13 +375,37 @@ export function Table({ view }: { view: GameView }) {
   const defenderName = view.players.find((p) => p.id === view.defenderId)?.name ?? '';
   const opponents = rotateFrom(view.players, me).filter((p) => p.id !== me);
   const positions = opponentPositions(opponents.length);
-  const n = view.hand.length;
+  // Eigene Reihenfolge (nur auf diesem Gerät): nach Wert, nach Farbe oder selbst hingezogen
+  const hand = sortHand(view.hand, handSort.mode, handSort.order, view.trumpSuit);
+  const n = hand.length;
   // Hand auffächern: ganze Breite nutzen; passt es nicht mehr lesbar, zwei Reihen
   const cw = handCw.current;
   const fitStep = (count: number) => (count <= 1 ? cw : (Math.max(handW, cw * 3) - cw - 16) / (count - 1));
   const twoRows = n > 1 && handW > 0 && fitStep(n) < cw * 0.3;
   const half = Math.ceil(n / 2);
-  const handRows = twoRows ? [view.hand.slice(0, half), view.hand.slice(half)] : [view.hand];
+  const handRows = twoRows ? [hand.slice(0, half), hand.slice(half)] : [hand];
+
+  // Nach dem Umsortieren: jede Karte gleitet von ihrer alten Stelle an die neue
+  useLayoutEffect(() => {
+    const from = flipFrom.current;
+    flipFrom.current = null;
+    const el = handRef.current;
+    if (!from || !el || typeof el.animate !== 'function') return;
+    const slots = el.querySelectorAll<HTMLElement>('.hand-slot');
+    hand.forEach((c, i) => {
+      const slot = slots[i];
+      const old = from.get(cardKey(c));
+      if (!slot || !old) return;
+      const now = centerOf(slot.getBoundingClientRect());
+      const dx = old.x - now.x;
+      const dy = old.y - now.y;
+      if (Math.abs(dx) + Math.abs(dy) < 1) return;
+      slot.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], {
+        duration: 240,
+        easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
+      });
+    });
+  }, [sortVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const newInHand = view.hand.filter((c) => !prev?.hand.some((h) => sameCard(h, c)));
   // Meine nachgezogenen Karten (ohne geschluckte Tischkarten) und ihre Plätze in der Reihenfolge
   const myDraws = newDeal
@@ -324,6 +428,14 @@ export function Table({ view }: { view: GameView }) {
     <main className="game">
       <div className={`arena${dealing ? ' dealing' : ''}`}>
         <div className="felt">
+          {!finished && !dealing && (
+            <AttackArrow
+              me={me}
+              attackerId={view.attackerId}
+              defenderId={view.defenderId}
+              layoutKey={view.players.map((p) => (p.out ? 'x' : 'o')).join('')}
+            />
+          )}
           <div
             className="deck"
             ref={deckRef}
@@ -341,7 +453,7 @@ export function Table({ view }: { view: GameView }) {
               </div>
             )}
             <div className={`trump-only ${isRed(trump) ? 'red' : ''}`} title={t('trump')}>
-              {suitSymbol(trump)}
+              <SuitIcon suit={trump} />
             </div>
           </div>
 
@@ -427,7 +539,7 @@ export function Table({ view }: { view: GameView }) {
                 aria-live="polite"
                 initial={{ scale: 2.6, opacity: 0, rotate: -18 }}
                 animate={{ scale: [2.6, 1, 1, 0.85], opacity: [0, 1, 1, 0.6], rotate: -8 }}
-                exit={{ opacity: 0, scale: 0.7 }}
+                exit={{ opacity: 0, scale: 0.7, transition: { duration: 0.3 } }}
                 transition={{ duration: 2.4, times: [0, 0.15, 0.75, 1] }}
               >
                 {isDefender ? t('stampYouTake') : t('stampNameTakes', { name: defenderName })}
@@ -478,7 +590,7 @@ export function Table({ view }: { view: GameView }) {
             done={view.passed.includes(p.id)}
             offline={!p.connected}
             out={p.out}
-            cardCount={p.cardCount - drawPending(p.id)}
+            cardCount={Math.max(0, p.cardCount - drawPending(p.id))}
             countdown={timedFor(p.id)}
             note={
               p.out
@@ -499,7 +611,7 @@ export function Table({ view }: { view: GameView }) {
         {finished && <Finished view={view} />}
       </div>
 
-      <section className={`me${turn.mine ? ' my-turn' : ''}`}>
+      <section className={`me${turn.mine ? ' my-turn' : ''}${turn.mine && isDefender ? ' must-defend' : ''}`}>
         <div className="me-bar">
           <div
             className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}${taking && isDefender ? ' is-taking' : ''}`}
@@ -560,7 +672,7 @@ export function Table({ view }: { view: GameView }) {
             <i style={{ transform: `scaleX(${myCountdown.fraction})` }} />
           </div>
         )}
-        <div className={`hand${twoRows ? ' two-rows' : ''}`} ref={handRef}>
+        <div className={`hand${twoRows ? ' two-rows' : ''}${sortGap ? ' sorting' : ''}`} ref={handRef}>
           {handRows.map((row, r) => (
             <div className="hand-row" key={r}>
               {row.map((card, i) => {
@@ -568,6 +680,16 @@ export function Table({ view }: { view: GameView }) {
                 const u = len > 1 ? (i - (len - 1) / 2) / ((len - 1) / 2) : 0; // −1 … 1
                 const maxRot = len <= 8 ? Math.min(12, 2.2 * len) : Math.max(3, 12 - (len - 8) * 0.6);
                 const step = Math.min(cw * 0.78, Math.max(cw * 0.3, fitStep(len)));
+                // Lücke beim Umsortieren: die Karten zwischen alter und neuer Stelle rücken um einen Platz
+                const idx = r === 0 ? i : half + i;
+                const g = !twoRows && sortGap;
+                const shift = !g
+                  ? 0
+                  : g.from < g.to && idx > g.from && idx <= g.to
+                    ? -step
+                    : g.to < g.from && idx >= g.to && idx < g.from
+                      ? step
+                      : 0;
                 const isSel = !!selected && sameCard(selected, card);
                 const canUse = usable(card);
                 const dip = u * u * maxRot * 1.3;
@@ -580,13 +702,17 @@ export function Table({ view }: { view: GameView }) {
                 const drawIdx = newDraws || newDeal ? myDraws.findIndex((c) => sameCard(c, card)) : -1;
                 const drawDelay =
                   drawIdx >= 0 && drawInfo && myDrawSlots[drawIdx] !== undefined
-                    ? Math.max(0, drawInfo.start + myDrawSlots[drawIdx] * drawInfo.step - Date.now())
+                    ? Math.max(0, drawInfo.start + drawInfo.at[myDrawSlots[drawIdx]] - Date.now())
                     : null;
                 return (
                   <FlySlot
                     key={cardKey(card)}
-                    className={`hand-slot${isSel || (dragging && sameCard(dragging, card)) ? ' is-selected' : ''}`}
-                    style={{ zIndex: i + 1, marginLeft: i === 0 ? 0 : step - cw }}
+                    className={`hand-slot${isSel || (dragging && sameCard(dragging, card)) || settling === cardKey(card) ? ' is-selected' : ''}`}
+                    style={{
+                      zIndex: i + 1,
+                      marginLeft: i === 0 ? 0 : step - cw,
+                      transform: shift ? `translateX(${shift}px)` : undefined,
+                    }}
                     from={() => fromTable(card) ?? deckPoint()}
                     delay={drawDelay ?? wait + Math.max(0, newIdx) * 80}
                     duration={drawDelay !== null && drawInfo ? drawInfo.fly : undefined}
@@ -595,23 +721,34 @@ export function Table({ view }: { view: GameView }) {
                     registryKey={cardKey(card)}
                   >
                     <motion.div
+                      key={sortKeys.current.get(cardKey(card)) ?? 0}
                       className={`hand-card${glow ? ' usable' : ''}${canUse ? ' playable' : ''}${hints && !canUse ? ' dim' : ''}${isSel ? ' selected' : ''}`}
                       animate={{ y: dip + lift, rotate: u * maxRot }}
                       whileHover={canUse && !isSel ? { y: dip + lift - 12 } : undefined}
                       transition={spring}
-                      drag={canUse}
+                      drag={!finished}
                       dragSnapToOrigin
                       whileDrag={{ scale: 1.1, rotate: 0, zIndex: 100 }}
                       onDragStart={() => {
                         setDragging(card);
                         setSelected(null);
+                        startSortDrag();
                       }}
-                      onDrag={(_, info: PanInfo) => setHover(dropAt(info.point))}
+                      onDrag={(_, info: PanInfo) => {
+                        const zone = canUse ? dropAt(info.point) : null;
+                        if (canUse) setHover(zone);
+                        const to = zone ? null : sortIndex(card, info.point);
+                        setSortGap((g) => (to === null ? null : g?.to === to ? g : { from: idx, to }));
+                      }}
                       onDragEnd={(_, info: PanInfo) => {
                         const zone = dropAt(info.point);
                         setDragging(null);
                         setHover(null);
-                        onDrop(card, zone);
+                        setSortGap(null);
+                        // Auf den Tisch → ausspielen; in der Hand → umsortieren
+                        if (zone && canUse) onDrop(card, zone);
+                        else reorder(card, info.point);
+                        sortDrag.current = null;
                       }}
                       onTap={() => onTap(card)}
                       role="button"

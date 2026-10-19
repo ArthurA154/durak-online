@@ -8,10 +8,12 @@ import { sfx } from './audio';
 /** So lange dauert das Mischen, bevor ausgeteilt wird */
 export const SHUFFLE_MS = 1500;
 
-/** Abstand zwischen zwei nachgezogenen Karten */
-const DRAW_STEP_MS = 700;
-/** Kurz warten, bis die alten Tischkarten weggeflogen sind */
-const DRAW_DELAY_MS = 350;
+/** Nachziehen Spieler für Spieler: Abstand zwischen den Karten eines Spielers … */
+const DRAW_CARD_MS = 300;
+/** … und Pause, bevor der nächste Spieler dran ist */
+const DRAW_PLAYER_GAP_MS = 550;
+/** Erst warten, bis die alten Tischkarten weggeflogen sind (Ablage oder zum Schlucker) */
+const DRAW_DELAY_MS = 650;
 const DRAW_FLY_MS = 600;
 /** Austeilen zu Beginn: zügiger, wie beim echten Geben */
 const DEAL_STEP_MS = 220;
@@ -80,8 +82,21 @@ interface Sequence {
   /** Spieler-ID pro Karte, in der Reihenfolge, in der sie fliegen */
   steps: string[];
   start: number;
-  step: number;
+  /** Startzeit jeder Karte (ms nach `start`) */
+  at: number[];
   fly: number;
+}
+
+/** Gleichmäßig (Austeilen) */
+const evenly = (steps: string[], step: number) => steps.map((_, i) => i * step);
+
+/** Nachziehen: Karten eines Spielers kurz hintereinander, dann Pause bis zum nächsten Spieler */
+function byPlayer(steps: string[]): number[] {
+  let t = 0;
+  return steps.map((id, i) => {
+    if (i > 0) t += id === steps[i - 1] ? DRAW_CARD_MS : DRAW_PLAYER_GAP_MS;
+    return t;
+  });
 }
 
 /**
@@ -105,18 +120,24 @@ export function useDrawSequence(
       ? Array.from({ length: HAND_SIZE }, () => view.players.map((p) => p.id)).flat()
       : null;
   if (newDraws)
-    seq.current = { steps: newDraws, start: Date.now() + DRAW_DELAY_MS, step: DRAW_STEP_MS, fly: DRAW_FLY_MS };
-  if (newDeal) seq.current = { steps: newDeal, start: Date.now() + SHUFFLE_MS, step: DEAL_STEP_MS, fly: DEAL_FLY_MS };
+    seq.current = { steps: newDraws, start: Date.now() + DRAW_DELAY_MS, at: byPlayer(newDraws), fly: DRAW_FLY_MS };
+  if (newDeal)
+    seq.current = {
+      steps: newDeal,
+      start: Date.now() + SHUFFLE_MS,
+      at: evenly(newDeal, DEAL_STEP_MS),
+      fly: DEAL_FLY_MS,
+    };
 
   const drawInfo = seq.current;
   const now = Date.now();
   /** Karten, die bei diesem Spieler noch nicht angekommen sind */
   const drawPending = (id: string) =>
     drawInfo
-      ? drawInfo.steps.filter((s, i) => s === id && now < drawInfo.start + i * drawInfo.step + drawInfo.fly).length
+      ? drawInfo.steps.filter((s, i) => s === id && now < drawInfo.start + drawInfo.at[i] + drawInfo.fly).length
       : 0;
   /** Karten, die noch auf dem Stapel liegen sollten (noch nicht losgeflogen) */
-  const deckPending = drawInfo ? drawInfo.steps.filter((_, i) => now < drawInfo.start + i * drawInfo.step).length : 0;
+  const deckPending = drawInfo ? drawInfo.steps.filter((_, i) => now < drawInfo.start + drawInfo.at[i]).length : 0;
 
   const key = drawInfo?.start ?? 0;
   useEffect(() => {
@@ -126,7 +147,7 @@ export function useDrawSequence(
       deckRef.current ? centerOf(deckRef.current.getBoundingClientRect()) : pointOf('.play-area');
     const timers: number[] = [];
     d.steps.forEach((id, i) => {
-      const launch = d.start + i * d.step - Date.now();
+      const launch = d.start + d.at[i] - Date.now();
       timers.push(
         window.setTimeout(
           () => {
@@ -140,7 +161,7 @@ export function useDrawSequence(
       );
       timers.push(window.setTimeout(() => redraw((n) => n + 1), Math.max(0, launch + d.fly)));
     });
-    const end = d.start + d.steps.length * d.step + d.fly - Date.now();
+    const end = d.start + (d.at[d.at.length - 1] ?? 0) + d.fly - Date.now();
     timers.push(
       window.setTimeout(() => {
         if (seq.current === d) seq.current = null;

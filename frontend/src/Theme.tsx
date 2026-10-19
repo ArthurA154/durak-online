@@ -6,7 +6,7 @@ import { t, type Key } from './i18n';
 // Farben kommen als CSS-Variablen auf <html>, die Tischoberfläche über [data-theme] in styles.css,
 // die Szene drumherum zeichnet <Backdrop>.
 
-export type ThemeId = 'classic' | 'wood' | 'pub' | 'space' | 'train' | 'kitchen' | 'beach' | 'casino';
+export type ThemeId = 'classic' | 'wood' | 'pub' | 'space' | 'kitchen' | 'beach' | 'casino';
 
 interface Theme {
   id: ThemeId;
@@ -55,15 +55,6 @@ const THEMES: Theme[] = [
     feltEdge: '#0a0d22',
     rim: '#0f1430',
     rimLight: '#4de1ff',
-  },
-  {
-    id: 'train',
-    room: '#17211f',
-    roomLight: '#26332f',
-    felt: '#c9c2b0',
-    feltEdge: '#a69f8c',
-    rim: '#6d727a',
-    rimLight: '#c5cad1',
   },
   {
     id: 'kitchen',
@@ -192,7 +183,6 @@ export function Backdrop() {
     <div className="backdrop" aria-hidden="true" data-scene={theme}>
       {theme === 'space' && <Space />}
       {theme === 'pub' && <Pub />}
-      {theme === 'train' && <Train />}
       {theme === 'kitchen' && <Kitchen />}
       {theme === 'beach' && <Beach />}
       {theme === 'casino' && <Casino />}
@@ -301,65 +291,6 @@ function Pub() {
         ))}
       </g>
       <ellipse cx="800" cy="0" rx="700" ry="520" fill="url(#lamp)" />
-    </svg>
-  );
-}
-
-function Train() {
-  // Großes Panoramafenster hinter dem Tisch: an den Rändern zieht die Landschaft vorbei
-  return (
-    <svg {...SCENE}>
-      <defs>
-        <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#141d3a" />
-          <stop offset="0.55" stopColor="#5b3a5e" />
-          <stop offset="0.8" stopColor="#c46a4a" />
-        </linearGradient>
-        <clipPath id="window">
-          <rect x="70" y="120" width="1460" height="640" rx="60" />
-        </clipPath>
-      </defs>
-      <rect width="1600" height="1000" fill="#1d2926" />
-      <g clipPath="url(#window)">
-        <rect x="70" y="120" width="1460" height="640" fill="url(#dusk)" />
-        <circle cx="1180" cy="620" r="60" fill="#ffc98a" opacity="0.85" />
-        <g className="train-far">
-          {[0, 1].map((k) => (
-            <path
-              key={k}
-              transform={`translate(${k * 1600} 0)`}
-              d="M0 640 Q120 560 260 610 T540 590 T820 615 T1100 585 T1380 620 T1600 600 V760 H0Z"
-              fill="#3d2a48"
-            />
-          ))}
-        </g>
-        <g className="train-near">
-          {[0, 1].map((k) => (
-            <g key={k} transform={`translate(${k * 1600} 0)`}>
-              <path d="M0 700 Q200 660 400 690 T800 680 T1200 695 T1600 690 V760 H0Z" fill="#221a2c" />
-              {Array.from({ length: 8 }, (_, i) => (
-                <g key={i} transform={`translate(${i * 200 + 60} 0)`} fill="#1a1422">
-                  <rect x="0" y="480" width="7" height="230" />
-                  <rect x="-20" y="494" width="47" height="6" />
-                </g>
-              ))}
-              {/* Birken */}
-              {Array.from({ length: 5 }, (_, i) => (
-                <g key={i} transform={`translate(${i * 320 + 150} 0)`}>
-                  <rect x="0" y="560" width="9" height="150" fill="#d9d4c8" opacity="0.75" />
-                  <ellipse cx="4" cy="560" rx="38" ry="52" fill="#2c2a3a" />
-                </g>
-              ))}
-            </g>
-          ))}
-        </g>
-      </g>
-      <rect x="70" y="120" width="1460" height="640" rx="60" fill="none" stroke="#7d848c" strokeWidth="18" />
-      <rect x="70" y="430" width="1460" height="12" fill="#7d848c" />
-      {/* Vorhänge links und rechts */}
-      <path d="M40 110 h150 q-40 160 0 320 q30 170 -50 340 h-100z" fill="#6e1c22" />
-      <path d="M1560 110 h-150 q40 160 0 320 q-30 170 50 340 h100z" fill="#6e1c22" />
-      <rect y="800" width="1600" height="200" fill="#26332f" />
     </svg>
   );
 }

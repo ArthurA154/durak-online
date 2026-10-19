@@ -5,6 +5,7 @@ import { ThemeGrid } from './Theme';
 import { LANG_NAMES, getLang, setLang, t } from './i18n';
 import { Segmented } from './Segmented';
 import { FooterLinks } from './Privacy';
+import { setHandSort, useHandSort, type HandSort } from './handSort';
 
 const GearIcon = () => (
   <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
@@ -20,6 +21,7 @@ const GearIcon = () => (
 
 /** ⚙️ in der Kopfleiste: Sprache, Lautstärke, Hintergrund – alles nur für dieses Gerät. */
 export function Settings() {
+  const { mode } = useHandSort();
   return (
     <Popover icon={<GearIcon />} label={t('settings')} className="settings-panel">
       <section className="settings-section">
@@ -29,6 +31,19 @@ export function Settings() {
           options={LANGS.map((l) => ({ value: l, label: LANG_NAMES[l] }))}
           onChange={setLang}
         />
+      </section>
+      <section className="settings-section">
+        <Segmented<HandSort>
+          label={t('handSort')}
+          value={mode}
+          options={[
+            { value: 'rank', label: t('sortRank') },
+            { value: 'suit', label: t('sortSuit') },
+            { value: 'custom', label: t('sortCustom') },
+          ]}
+          onChange={setHandSort}
+        />
+        <p className="settings-hint">{t('sortCustomHint')}</p>
       </section>
       <section className="settings-section">
         <h3>{t('volume')}</h3>
