@@ -185,6 +185,7 @@ export function Home({ message = '' }: { message?: string }) {
                       {t('playersOf', { n: l.players, max: MAX_PLAYERS })}
                       {l.neighborsOnly ? ` · ${t('neighborsOnlyShort')}` : ''}
                       {l.unlimited ? ` · ${t('attackUnlimited')}` : ''}
+                      {l.transfer === false ? ` · ${t('podkidnoyShort')}` : ''}
                     </span>
                   </span>
                   <button

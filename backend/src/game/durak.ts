@@ -54,13 +54,16 @@ export class DurakGame {
   readonly neighborsOnly: boolean;
   /** Höchstzahl Angriffskarten pro Runde (Standard 6; „unbegrenzt“ = nur durch die Hand des Verteidigers) */
   readonly maxTable: number;
+  /** Weiterschieben erlaubt (Perevodnoy); aus = Podkidnoy */
+  readonly allowTransfer: boolean;
 
   constructor(
     playerIds: string[],
     deck: Card[] = shuffle(createDeck()),
-    opts: { firstAttackerId?: string | null; neighborsOnly?: boolean; unlimited?: boolean } = {},
+    opts: { firstAttackerId?: string | null; neighborsOnly?: boolean; unlimited?: boolean; transfer?: boolean } = {},
   ) {
     this.neighborsOnly = !!opts.neighborsOnly;
+    this.allowTransfer = opts.transfer ?? true;
     this.maxTable = opts.unlimited ? Infinity : MAX_TABLE;
     if (playerIds.length < MIN_PLAYERS || playerIds.length > MAX_PLAYERS) {
       throw new GameError(`${MIN_PLAYERS}–${MAX_PLAYERS} Spieler nötig`);
@@ -151,6 +154,7 @@ export class DurakGame {
   transfer(playerId: string, card: Card): void {
     const p = this.requirePlayer(playerId);
     this.requireRunning();
+    if (!this.allowTransfer) throw new GameError('In diesem Raum wird ohne Weiterschieben gespielt');
     if (p !== this.defender) throw new GameError('Nur der Verteidiger darf weiterschieben');
     if (this.taking) throw new GameError('Du hast schon „Schlucken“ gewählt');
     if (this.table.length === 0) throw new GameError('Es liegt nichts auf dem Tisch');

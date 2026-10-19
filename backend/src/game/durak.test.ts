@@ -128,6 +128,14 @@ describe('Weiterschieben (Perevodnoy)', () => {
     expect(() => g.transfer('b', c(7, 'H'))).toThrow('ersten Schlagen');
   });
 
+  it('Podkidnoy: Weiterschieben ist aus', () => {
+    const g = new DurakGame(['a', 'b', 'c'], rigDeck([handA, handB, handC], c(14, 'C')), { transfer: false });
+    g.attack('a', c(7, 'S'));
+    expect(() => g.transfer('b', c(7, 'H'))).toThrow('ohne Weiterschieben');
+    expect(g.defender.id).toBe('b');
+    expect(g.table).toHaveLength(1);
+  });
+
   it('kein Weiterschieben, wenn der Nächste zu wenig Karten hat', () => {
     const g = setup();
     g.players[2].hand = [c(14, 'H')];

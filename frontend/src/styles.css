@@ -2294,6 +2294,45 @@ input:focus {
   color: #1b1600;
 }
 
+/* Mitspieler sehen die Regeln, können sie aber nicht ändern */
+.room-settings.read-only .segmented button {
+  cursor: default;
+}
+
+.room-settings.read-only .segmented button:not(.on) {
+  opacity: 0.45;
+}
+
+.lobby-rules {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+}
+
+/* Regeln im Spiel (Knopf oben) */
+.rules-panel {
+  width: min(400px, calc(100vw - 24px));
+}
+
+.rules-panel .room-settings {
+  width: 100%;
+}
+
+.rules-title {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.room-settings-title {
+  margin: 0 0 2px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .room-settings {
   display: grid;
   gap: 10px;

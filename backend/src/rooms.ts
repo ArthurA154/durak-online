@@ -14,7 +14,9 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   THROW_IN_MS,
-  TURN_MS,
+  TURN_CHOICES,
+  DEFAULT_TURN_SECONDS,
+  type TurnSeconds,
   type GameView,
   type Session,
 } from '@durak/shared';
@@ -127,7 +129,14 @@ export class RoomManager {
       gameStartedAt: null,
       gamePlayers: [],
       chat: [],
-      settings: { public: isPublic, neighborsOnly: false, unlimited: false, hints: false },
+      settings: {
+        public: isPublic,
+        neighborsOnly: false,
+        unlimited: false,
+        hints: false,
+        turnSeconds: DEFAULT_TURN_SECONDS,
+        transfer: true,
+      },
       banned: new Set(),
     };
     this.rooms.set(code, room);
@@ -197,6 +206,8 @@ export class RoomManager {
     if (typeof change?.neighborsOnly === 'boolean') room.settings.neighborsOnly = change.neighborsOnly;
     if (typeof change?.unlimited === 'boolean') room.settings.unlimited = change.unlimited;
     if (typeof change?.hints === 'boolean') room.settings.hints = change.hints;
+    if (TURN_CHOICES.includes(change?.turnSeconds as TurnSeconds)) room.settings.turnSeconds = change.turnSeconds!;
+    if (typeof change?.transfer === 'boolean') room.settings.transfer = change.transfer;
   }
 
   /** Gastgeber wirft jemanden aus dem Raum (nicht während einer Partie). Gibt dessen Verbindung zurück. */
@@ -226,6 +237,7 @@ export class RoomManager {
         players: room.players.length,
         neighborsOnly: room.settings.neighborsOnly,
         unlimited: room.settings.unlimited,
+        transfer: room.settings.transfer,
       });
     }
     return list.slice(0, 50);
@@ -250,6 +262,7 @@ export class RoomManager {
       firstAttackerId: durak,
       neighborsOnly: room.settings.neighborsOnly,
       unlimited: room.settings.unlimited,
+      transfer: room.settings.transfer,
     });
     room.dealerId = durak;
     room.round++;
@@ -357,7 +370,7 @@ export class RoomManager {
     if (kind === 'throwIn' && room.timerKind === 'throwIn' && room.timer && !this.isPaused(room)) return;
     this.clearTimer(room);
     if (!isRunning(room) || this.isPaused(room)) return;
-    const ms = kind === 'throwIn' ? THROW_IN_MS : TURN_MS;
+    const ms = kind === 'throwIn' ? THROW_IN_MS : room.settings.turnSeconds * 1000;
     room.timerKind = kind;
     room.deadline = Date.now() + ms;
     room.timer = setTimeout(() => {
@@ -421,7 +434,7 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
         ? {
             waitingOn: g.waitingOn(),
             remainingMs: Math.max(0, room.deadline - now),
-            totalMs: room.timerKind === 'throwIn' ? THROW_IN_MS : TURN_MS,
+            totalMs: room.timerKind === 'throwIn' ? THROW_IN_MS : room.settings.turnSeconds * 1000,
             kind: room.timerKind,
           }
         : null,

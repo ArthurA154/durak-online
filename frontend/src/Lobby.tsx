@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MAX_PLAYERS, MIN_PLAYERS, type GameView } from '@durak/shared';
 import { call, socket } from './socket';
 import { Seat, type SeatPos } from './Seat';
-import { Segmented } from './Segmented';
+import { RuleControls } from './Rules';
 import { t } from './i18n';
 
 const CHAIRS: SeatPos[] = ['bottom', 'left', 'top', 'right'];
@@ -90,53 +90,11 @@ export function Lobby({ view }: { view: GameView }) {
         })}
       </div>
 
-      {isHost ? (
-        <div className="room-settings">
-          <Segmented
-            label={t('room')}
-            value={view.settings.public}
-            options={[
-              { value: false, label: t('private') },
-              { value: true, label: t('public') },
-            ]}
-            onChange={(v) => change({ public: v })}
-          />
-          <Segmented
-            label={t('throwIn')}
-            value={view.settings.neighborsOnly}
-            options={[
-              { value: false, label: t('all') },
-              { value: true, label: t('neighborsOnly') },
-            ]}
-            onChange={(v) => change({ neighborsOnly: v })}
-          />
-          <Segmented
-            label={t('attackLimit')}
-            value={view.settings.unlimited}
-            options={[
-              { value: false, label: t('max6') },
-              { value: true, label: t('unlimited') },
-            ]}
-            onChange={(v) => change({ unlimited: v })}
-          />
-          <Segmented
-            label={t('hints')}
-            value={view.settings.hints}
-            options={[
-              { value: false, label: t('hintsOff') },
-              { value: true, label: t('hintsOn') },
-            ]}
-            onChange={(v) => change({ hints: v })}
-          />
-        </div>
-      ) : (
-        <p className="lobby-note">
-          {view.settings.public ? t('publicRoom') : t('privateRoom')} · {t('throwIn')}:{' '}
-          {view.settings.neighborsOnly ? t('throwInNeighbors') : t('throwInAll')} ·{' '}
-          {view.settings.unlimited ? t('attackUnlimited') : t('attackMax6')}
-          {view.settings.hints ? ` · ${t('hintsNote')}` : ''}
-        </p>
-      )}
+      {/* Alle sehen die Regeln; ändern kann sie nur der Gastgeber */}
+      <div className="lobby-rules">
+        {!isHost && <p className="room-settings-title">{t('rulesByHost')}</p>}
+        <RuleControls settings={view.settings} onChange={isHost ? change : undefined} showRoom />
+      </div>
 
       {isHost ? (
         <button type="button" className="btn" onClick={start} disabled={!enough}>

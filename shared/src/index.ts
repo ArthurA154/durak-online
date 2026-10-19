@@ -19,10 +19,14 @@ export const MAX_TABLE = 6;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 
-/** Zug-Timer: erst 15 s ohne Anzeige, dann 10 s sichtbarer Countdown. */
-export const TURN_SILENT_MS = 15_000;
+/** Zugzeit, die der Gastgeber in der Lobby wählen kann (Sekunden). Standard 25. */
+export const TURN_CHOICES = [15, 25, 40, 60] as const;
+export type TurnSeconds = (typeof TURN_CHOICES)[number];
+export const DEFAULT_TURN_SECONDS: TurnSeconds = 25;
+/** Zug-Timer: die letzten 10 s sind als Countdown sichtbar, vorher läuft er still. */
 export const TURN_WARN_MS = 10_000;
-export const TURN_MS = TURN_SILENT_MS + TURN_WARN_MS;
+/** Standard-Zugzeit in ms */
+export const TURN_MS = DEFAULT_TURN_SECONDS * 1000;
 /** Nach „Schlucken“: so lange dürfen die anderen noch nachlegen */
 export const THROW_IN_MS = 4_000;
 
@@ -74,6 +78,10 @@ export interface RoomSettings {
   unlimited: boolean;
   /** Spielhilfen: passende Karten leuchten (Standard aus – selbst aufpassen) */
   hints: boolean;
+  /** Zugzeit in Sekunden */
+  turnSeconds: TurnSeconds;
+  /** Weiterschieben erlaubt (Perevodnoy, Standard); aus = Podkidnoy */
+  transfer: boolean;
 }
 
 /** Eintrag in der Liste offener Spiele auf der Startseite */
@@ -85,6 +93,7 @@ export interface OpenLobby {
   players: number;
   neighborsOnly: boolean;
   unlimited: boolean;
+  transfer: boolean;
 }
 
 export interface PlayerView {

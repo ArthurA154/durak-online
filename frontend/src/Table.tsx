@@ -221,6 +221,7 @@ export function Table({ view }: { view: GameView }) {
       : view.table.flatMap((t, i) => (!t.defense && beats(t.attack, c, trump) ? [i] : []));
 
   const canTransferWith = (c: Card) =>
+    view.settings.transfer &&
     isDefender &&
     !view.taking &&
     view.table.length > 0 &&

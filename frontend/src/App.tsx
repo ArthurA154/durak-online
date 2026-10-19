@@ -1,3 +1,4 @@
+import { RulesButton } from './Rules';
 import { useEffect, useState } from 'react';
 import type { GameView, Session } from '@durak/shared';
 import { call, connectErrorText, loadSession, saveSession, socket } from './socket';
@@ -109,6 +110,7 @@ export function App() {
           <span />
         )}
         <div className="topbar-right">
+          {inGame && <RulesButton settings={view.settings} />}
           {view && <Chat me={view.you} quickOnly={view.settings.public} />}
           <Settings />
           {view && (

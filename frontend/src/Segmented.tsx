@@ -1,5 +1,5 @@
 /** Umschalter mit zwei (oder mehr) Möglichkeiten, z. B. „Privat | Öffentlich“. */
-export function Segmented<T extends string | boolean>(props: {
+export function Segmented<T extends string | boolean | number>(props: {
   label: string;
   value: T;
   options: { value: T; label: string }[];

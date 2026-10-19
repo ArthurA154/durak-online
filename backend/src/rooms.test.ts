@@ -26,6 +26,20 @@ describe('Zug-Timer im Raum', () => {
     expect(fired).toHaveBeenCalledOnce();
   });
 
+  it('gewählte Zugzeit gilt (z. B. 15 s)', () => {
+    const rooms = new RoomManager();
+    const { room } = rooms.create('Anna', 0, 's1');
+    rooms.join(room.code, 'Ben', 1, 's2');
+    rooms.updateSettings(room, room.hostId, { turnSeconds: 15 });
+    rooms.start(room, room.hostId);
+    rooms.armTimer(room, () => {});
+    expect(viewFor(room, room.hostId).timer).toMatchObject({ totalMs: 15_000 });
+    vi.advanceTimersByTime(14_999);
+    expect(room.game!.table).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(room.game!.table).toHaveLength(1);
+  });
+
   it('der Stand enthält die Restzeit und auf wen gewartet wird', () => {
     const { rooms, room } = startedRoom();
     rooms.armTimer(room, () => {});
@@ -242,7 +256,7 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const pub = rooms.create('Anna', 0, 's1', true).room;
     rooms.create('Privat', 1, 's2');
     expect(rooms.openLobbies()).toEqual([
-      { code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false },
+      { code: pub.code, host: 'Anna', color: 0, players: 1, neighborsOnly: false, unlimited: false, transfer: true },
     ]);
     const b = rooms.join(pub.code, 'Ben', 1, 's3').session;
     rooms.start(pub, pub.hostId);
@@ -256,11 +270,30 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const b = rooms.join(room.code, 'Ben', 1, 's2').session;
     expect(() => rooms.updateSettings(room, b.playerId, { public: true })).toThrow('Nur der Gastgeber');
     expect(room.settings.hints).toBe(false); // Standard: selbst aufpassen
-    rooms.updateSettings(room, session.playerId, { public: true, neighborsOnly: true, unlimited: true, hints: true });
-    expect(room.settings).toEqual({ public: true, neighborsOnly: true, unlimited: true, hints: true });
+    expect(room.settings).toMatchObject({ turnSeconds: 25, transfer: true }); // Standard
+    rooms.updateSettings(room, session.playerId, {
+      public: true,
+      neighborsOnly: true,
+      unlimited: true,
+      hints: true,
+      turnSeconds: 40,
+      transfer: false,
+    });
+    expect(room.settings).toEqual({
+      public: true,
+      neighborsOnly: true,
+      unlimited: true,
+      hints: true,
+      turnSeconds: 40,
+      transfer: false,
+    });
+    // Ungültige Zugzeit wird ignoriert
+    rooms.updateSettings(room, session.playerId, { turnSeconds: 7 as never });
+    expect(room.settings.turnSeconds).toBe(40);
     rooms.start(room, session.playerId);
     expect(room.game!.neighborsOnly).toBe(true);
     expect(room.game!.maxTable).toBe(Infinity);
+    expect(room.game!.allowTransfer).toBe(false);
     expect(() => rooms.updateSettings(room, session.playerId, { public: false })).toThrow('Erst nach der Partie');
   });
 

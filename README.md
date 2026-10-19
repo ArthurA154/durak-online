@@ -1,6 +1,6 @@
 # Durak online
 
-Das russische Kartenspiel **Durak** im Browser – für 2 bis 4 Spieler, Variante _Perevodnoy_ (mit Weiterschieben).
+Das russische Kartenspiel **Durak** im Browser – für 2 bis 4 Spieler, wahlweise _Perevodnoy_ (mit Weiterschieben) oder _Podkidnoy_.
 
 ### ▶️ Jetzt spielen: **https://arthura154.github.io/durak-online/**
 
@@ -9,7 +9,7 @@ Raum erstellen, Code oder Link an die Freunde schicken, loslegen. Läuft am Hand
 ## Was drin ist
 
 - **Echtzeit-Multiplayer**: private Räume mit Code oder öffentliche Räume aus der Liste „Offene Spiele“
-- **Regeln** mit 36 Karten (6 bis Ass), Trumpf ist die unterste Karte, Weiterschieben, Unentschieden. Einstellbar in der Lobby: Nachlegen „alle“ oder „nur Nachbarn“ und Angriff mit maximal 6 Karten oder unbegrenzt
+- **Regeln** mit 36 Karten (6 bis Ass), Trumpf ist die unterste Karte, Weiterschieben, Unentschieden. Einstellbar in der Lobby: mit oder ohne Weiterschieben, Zugzeit 15 bis 60 Sekunden, Nachlegen „alle“ oder „nur Nachbarn“ und Angriff mit maximal 6 Karten oder unbegrenzt
 - **Zug-Timer** und ein 4-Sekunden-Countdown zum Nachlegen nach dem Schlucken
 - **Chat** mit Sprechblasen und Schnellsprüchen, dazu Tomaten, Eier, Hausschuhe, Fische und Blumen zum Werfen 🍅
 - **Durak-Zähler** als Rangliste. Die Narrenkappe trägt der Durak der letzten Partie

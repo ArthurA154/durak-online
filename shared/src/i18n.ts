@@ -48,6 +48,10 @@ export const SERVER_ERRORS: Record<string, Other> = {
     en: 'Only the attacker makes the first move',
     ru: 'Первым ходит только нападающий',
   },
+  'In diesem Raum wird ohne Weiterschieben gespielt': {
+    en: 'This room plays without transferring',
+    ru: 'В этой комнате играют без перевода',
+  },
   'Nur die Nachbarn des Verteidigers dürfen nachlegen': {
     en: "Only the defender's neighbours may throw in",
     ru: 'Подкидывать могут только соседи отбивающегося',
