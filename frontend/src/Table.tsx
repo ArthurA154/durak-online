@@ -279,6 +279,23 @@ export function Table({ view }: { view: GameView }) {
   const activeTransfer = !!active && canTransferWith(active);
   const tableGlows = !!playDrag && (isDefender ? activeTransfer : hints ? canAttackWith(playDrag) : myMove);
 
+  /** Was passiert beim Loslassen? Als Verteidiger deutlich anzeigen: weiterschieben oder schlagen */
+  const nextDefender = (() => {
+    const ids = view.players.filter((p) => !p.out || p.id === me).map((p) => p.id);
+    const i = ids.indexOf(me);
+    return view.players.find((p) => p.id === ids[(i + 1) % ids.length]);
+  })();
+  const dropIntent: 'transfer' | 'beat' | null =
+    !playDrag || !isDefender || !hover
+      ? null
+      : hover.startsWith('attack-')
+        ? 'beat'
+        : activeTransfer
+          ? 'transfer'
+          : openTargets(playDrag).length === 1
+            ? 'beat'
+            : null;
+
   // ---------- Umsortieren in der Hand ----------
   // Beim Ziehen rücken die anderen Karten zur Seite; beim Loslassen gleitet alles an den neuen Platz.
 
@@ -471,6 +488,11 @@ export function Table({ view }: { view: GameView }) {
             style={manyStyle}
             data-drop="table"
           >
+            {dropIntent && (
+              <div className={`drop-intent ${dropIntent}`} aria-live="polite">
+                {dropIntent === 'transfer' ? t('dropTransfer', { name: nextDefender?.name ?? '' }) : t('dropBeat')}
+              </div>
+            )}
             {view.table.map((pair, i) => {
               const key = cardKey(pair.attack);
               const isTarget = activeTargets.includes(i);
