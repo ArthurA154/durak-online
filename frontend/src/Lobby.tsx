@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MAX_PLAYERS, MIN_PLAYERS, type GameView } from '@durak/shared';
 import { call, socket } from './socket';
 import { Seat, type SeatPos } from './Seat';
-import { RuleControls } from './Rules';
+import { RuleControls, RuleSummary } from './Rules';
 import { t } from './i18n';
 
 const CHAIRS: SeatPos[] = ['bottom', 'left', 'top', 'right'];
@@ -91,10 +91,16 @@ export function Lobby({ view }: { view: GameView }) {
         })}
       </div>
 
-      {/* Alle sehen die Regeln; ändern kann sie nur der Gastgeber */}
+      {/* Der Gastgeber stellt die Regeln ein, alle anderen sehen nur die Zusammenfassung */}
       <div className="lobby-rules">
-        {!isHost && <p className="room-settings-title">{t('rulesByHost')}</p>}
-        <RuleControls settings={view.settings} onChange={isHost ? change : undefined} showRoom />
+        {isHost ? (
+          <RuleControls settings={view.settings} onChange={change} showRoom />
+        ) : (
+          <>
+            <p className="room-settings-title">{t('rulesByHost')}</p>
+            <RuleSummary settings={view.settings} showRoom />
+          </>
+        )}
       </div>
 
       {isHost ? (

@@ -1,9 +1,9 @@
+import type { ReactNode } from 'react';
 import { LANGS } from '@durak/shared';
 import { Popover } from './Popover';
 import { VolumeSliders } from './Volume';
-import { ThemeGrid } from './Theme';
-import { LANG_NAMES, getLang, setLang, t } from './i18n';
-import { Segmented } from './Segmented';
+import { THEME_IDS, ThemePreview, setTheme, useTheme } from './Theme';
+import { LANG_NAMES, getLang, setLang, t, type Key } from './i18n';
 import { FooterLinks } from './Privacy';
 import { setHandSort, useHandSort, type HandSort } from './handSort';
 import { CARD_BACKS, backVars, setCardBack, useCardBack } from './cardBack';
@@ -20,60 +20,109 @@ const GearIcon = () => (
   </svg>
 );
 
-/** ⚙️ in der Kopfleiste: Sprache, Lautstärke, Hintergrund – alles nur für dieses Gerät. */
+const Chevron = ({ left }: { left?: boolean }) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+    <path
+      d={left ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const SORTS: { value: HandSort; label: Key }[] = [
+  { value: 'rank', label: 'sortRank' },
+  { value: 'suit', label: 'sortSuit' },
+  { value: 'custom', label: 'sortCustom' },
+];
+
+/**
+ * ⚙️ in der Kopfleiste – alles nur für dieses Gerät. Lautstärke als Regler, der Rest zum Durchtippen:
+ * jede Zeile zeigt den aktuellen Wert, ‹ › (oder Tipp auf den Wert) wechselt sofort.
+ */
 export function Settings() {
   const { mode } = useHandSort();
   const back = useCardBack();
+  const theme = useTheme();
   return (
     <Popover icon={<GearIcon />} label={t('settings')} className="settings-panel">
       <section className="settings-section">
-        <Segmented
+        <h3>{t('volume')}</h3>
+        <VolumeSliders />
+      </section>
+      <div className="settings-list">
+        <CycleRow
           label={t('language')}
           value={getLang()}
           options={LANGS.map((l) => ({ value: l, label: LANG_NAMES[l] }))}
           onChange={setLang}
         />
-      </section>
-      <section className="settings-section">
-        <Segmented<HandSort>
+        <CycleRow
           label={t('handSort')}
           value={mode}
-          options={[
-            { value: 'rank', label: t('sortRank') },
-            { value: 'suit', label: t('sortSuit') },
-            { value: 'custom', label: t('sortCustom') },
-          ]}
+          options={SORTS.map((s) => ({ value: s.value, label: t(s.label) }))}
           onChange={setHandSort}
         />
-        <p className="settings-hint">{t('sortCustomHint')}</p>
-      </section>
-      <section className="settings-section">
-        <h3>{t('volume')}</h3>
-        <VolumeSliders />
-      </section>
-      <section className="settings-section">
-        <h3>{t('cardBack')}</h3>
-        <div className="back-grid" role="radiogroup" aria-label={t('cardBack')}>
-          {CARD_BACKS.map((b, i) => (
-            <button
-              key={b.id}
-              type="button"
-              role="radio"
-              aria-checked={b.id === back}
-              aria-label={t('cardBackN', { n: i + 1 })}
-              className={`back-tile${b.id === back ? ' on' : ''}`}
-              onClick={() => setCardBack(b.id)}
-            >
-              <span className="card back" style={backVars(b)} />
-            </button>
-          ))}
-        </div>
-      </section>
-      <section className="settings-section">
-        <h3>{t('background')}</h3>
-        <ThemeGrid />
-      </section>
+        <CycleRow
+          label={t('cardBack')}
+          value={back}
+          options={CARD_BACKS.map((b, i) => ({
+            value: b.id,
+            label: <span className="card back" style={backVars(b)} aria-label={t('cardBackN', { n: i + 1 })} />,
+          }))}
+          onChange={setCardBack}
+        />
+        <CycleRow
+          label={t('background')}
+          value={theme}
+          options={THEME_IDS.map((id) => ({
+            value: id,
+            label: (
+              <>
+                <ThemePreview id={id} />
+                {t(`theme.${id}` as Key)}
+              </>
+            ),
+          }))}
+          onChange={setTheme}
+        />
+      </div>
+      {mode === 'custom' && <p className="settings-hint">{t('sortCustomHint')}</p>}
       <FooterLinks />
     </Popover>
+  );
+}
+
+/** Eine Einstellung zum Durchtippen: Beschriftung links, ‹ Wert › rechts (läuft im Kreis) */
+function CycleRow<T extends string>(props: {
+  label: string;
+  value: T;
+  options: { value: T; label: ReactNode }[];
+  onChange: (v: T) => void;
+}) {
+  const { options } = props;
+  const i = Math.max(
+    0,
+    options.findIndex((o) => o.value === props.value),
+  );
+  const step = (d: number) => props.onChange(options[(i + d + options.length) % options.length].value);
+  return (
+    <div className="cycle-row" role="group" aria-label={props.label}>
+      <span className="cycle-label">{props.label}</span>
+      <div className="cycle">
+        <button type="button" className="cycle-arrow" onClick={() => step(-1)} aria-label={t('previous')}>
+          <Chevron left />
+        </button>
+        <button type="button" className="cycle-value" onClick={() => step(1)} aria-live="polite">
+          {options[i].label}
+        </button>
+        <button type="button" className="cycle-arrow" onClick={() => step(1)} aria-label={t('next')}>
+          <Chevron />
+        </button>
+      </div>
+    </div>
   );
 }

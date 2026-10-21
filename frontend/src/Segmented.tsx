@@ -4,7 +4,6 @@ export function Segmented<T extends string | boolean | number>(props: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
-  disabled?: boolean;
 }) {
   return (
     <div className="segmented-row">
@@ -17,7 +16,6 @@ export function Segmented<T extends string | boolean | number>(props: {
             role="radio"
             aria-checked={o.value === props.value}
             className={o.value === props.value ? 'on' : undefined}
-            disabled={props.disabled}
             onClick={() => o.value !== props.value && props.onChange(o.value)}
           >
             {o.label}

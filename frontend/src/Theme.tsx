@@ -1,5 +1,4 @@
 import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
-import { t, type Key } from './i18n';
 
 // Hintergründe („Themen“): jeder wählt für sich, gespeichert nur auf diesem Gerät.
 // Alles gezeichnet (CSS + SVG) – keine Bilder, lädt sofort, gestochen scharf.
@@ -85,6 +84,8 @@ const THEMES: Theme[] = [
   },
 ];
 
+export const THEME_IDS = THEMES.map((th) => th.id);
+
 const KEY = 'durak.theme';
 
 function load(): ThemeId {
@@ -105,7 +106,7 @@ const subscribe = (fn: () => void) => {
 };
 const get = () => current;
 
-function setTheme(id: ThemeId): void {
+export function setTheme(id: ThemeId): void {
   current = id;
   try {
     localStorage.setItem(KEY, id);
@@ -128,41 +129,26 @@ function apply(id: ThemeId): void {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', th.room);
 }
 
-const useTheme = () => useSyncExternalStore(subscribe, get);
+export const useTheme = () => useSyncExternalStore(subscribe, get);
 
-// ---------- Auswahl ----------
-
-export function ThemeGrid() {
-  const theme = useTheme();
+/** Kleines Bildchen eines Hintergrunds (Raum + Tisch) – für die Auswahl in den Einstellungen */
+export function ThemePreview({ id }: { id: ThemeId }) {
+  const th = THEMES.find((x) => x.id === id) ?? THEMES[0];
   return (
-    <div className="theme-grid" role="radiogroup" aria-label={t('background')}>
-      {THEMES.map((th) => (
-        <button
-          key={th.id}
-          type="button"
-          role="radio"
-          aria-checked={th.id === theme}
-          className={`theme-tile${th.id === theme ? ' on' : ''}`}
-          onClick={() => setTheme(th.id)}
-        >
-          <span
-            className="theme-preview"
-            data-preview={th.id}
-            style={
-              {
-                '--p-room': th.room,
-                '--p-felt': th.felt,
-                '--p-edge': th.feltEdge,
-                '--p-rim': th.rimLight,
-              } as CSSProperties
-            }
-          >
-            <i />
-          </span>
-          <span className="theme-name">{t(`theme.${th.id}` as Key)}</span>
-        </button>
-      ))}
-    </div>
+    <span
+      className="theme-preview"
+      data-preview={th.id}
+      style={
+        {
+          '--p-room': th.room,
+          '--p-felt': th.felt,
+          '--p-edge': th.feltEdge,
+          '--p-rim': th.rimLight,
+        } as CSSProperties
+      }
+    >
+      <i />
+    </span>
   );
 }
 
