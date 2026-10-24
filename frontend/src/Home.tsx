@@ -254,6 +254,7 @@ export function Home({ message = '' }: { message?: string }) {
                     <b>{l.host}</b>
                     <span>
                       {t('playersOf', { n: l.players, max: MAX_PLAYERS })}
+                      {l.bots ? ` · ${t('botsN', { n: l.bots })}` : ''}
                       {l.neighborsOnly ? ` · ${t('neighborsOnlyShort')}` : ''}
                       {l.unlimited ? ` · ${t('attackUnlimited')}` : ''}
                       {l.transfer === false ? ` · ${t('podkidnoyShort')}` : ''}

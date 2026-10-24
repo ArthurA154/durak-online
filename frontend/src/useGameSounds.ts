@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { GameView } from '@durak/shared';
 import { sfx } from './audio';
+import { RESULT_DELAY_MS } from './dealing';
 import { turnInfo } from './turn';
 
 const cardsOnTable = (v: GameView) => v.table.reduce((n, t) => n + (t.defense ? 2 : 1), 0);
@@ -21,7 +22,11 @@ export function useGameSounds(view: GameView | null): void {
       return;
     }
     if (p.phase === 'playing' && view.phase === 'finished') {
-      return view.durakId === view.you ? sfx.lose() : sfx.win();
+      // erst wenn das Ergebnis erscheint – vorher sieht man noch die letzten Karten
+      const lost = view.durakId === view.you;
+      window.setTimeout(() => (lost ? sfx.lose() : sfx.win()), RESULT_DELAY_MS);
+      if (cardsOnTable(view) > cardsOnTable(p)) sfx.card();
+      return;
     }
 
     if (cardsOnTable(view) > cardsOnTable(p)) sfx.card();

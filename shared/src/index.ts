@@ -30,6 +30,37 @@ export const TURN_MS = DEFAULT_TURN_SECONDS * 1000;
 /** Nach „Schlucken“: so lange dürfen die anderen noch nachlegen */
 export const THROW_IN_MS = 4_000;
 
+// ---------- Austeilen & Nachziehen ----------
+// Die Animation läuft im Browser; der Server wartet genau so lange, bevor jemand ziehen darf.
+
+/** Mischen vor dem Austeilen */
+export const SHUFFLE_MS = 1500;
+/** Austeilen: Abstand zwischen zwei Karten und Flugzeit einer Karte */
+export const DEAL_STEP_MS = 220;
+export const DEAL_FLY_MS = 450;
+/** Nachziehen: erst warten, bis die Tischkarten weggeflogen sind … */
+export const DRAW_DELAY_MS = 650;
+/** … dann Karte für Karte, Spieler für Spieler */
+export const DRAW_CARD_MS = 300;
+export const DRAW_PLAYER_GAP_MS = 550;
+export const DRAW_FLY_MS = 600;
+
+/** Startzeit jeder nachgezogenen Karte (eine Spieler-ID pro Karte, in Zieh-Reihenfolge) */
+export function drawTimes(steps: string[]): number[] {
+  let t = 0;
+  return steps.map((id, i) => {
+    if (i > 0) t += id === steps[i - 1] ? DRAW_CARD_MS : DRAW_PLAYER_GAP_MS;
+    return t;
+  });
+}
+
+/** So lange dauert Mischen + Austeilen einer neuen Partie */
+export const dealDurationMs = (players: number) => SHUFFLE_MS + (players * HAND_SIZE - 1) * DEAL_STEP_MS + DEAL_FLY_MS;
+
+/** So lange dauert das Nachziehen nach einer Runde */
+export const drawDurationMs = (steps: string[]) =>
+  steps.length ? DRAW_DELAY_MS + (drawTimes(steps).at(-1) ?? 0) + DRAW_FLY_MS : 0;
+
 /** Wer so lange getrennt ist, darf von den anderen aus dem Raum entfernt werden (bzw. fliegt aus der Lobby). */
 export const AWAY_KICK_MS = 60_000;
 
@@ -145,6 +176,8 @@ export interface OpenLobby {
   color: number;
   look: Look;
   players: number;
+  /** davon Bots – ein Mensch, der beitritt, nimmt einem Bot den Platz */
+  bots: number;
   neighborsOnly: boolean;
   unlimited: boolean;
   transfer: boolean;
@@ -164,6 +197,8 @@ export interface PlayerView {
   durakCount: number;
   /** Getrennt seit … ms (beim Senden); null = verbunden */
   awayMs: number | null;
+  /** Vom Server gespielt (kein Mensch) */
+  bot: boolean;
 }
 
 /** Was ein einzelner Spieler vom Spiel sieht – nur die eigenen Karten. */
@@ -207,6 +242,8 @@ export interface GameView {
   settings: RoomSettings;
   /** Wer gerade nachlegen darf (bei „nur Nachbarn“ nicht alle) */
   throwers: string[];
+  /** Karten werden noch ausgeteilt/nachgezogen – so lange (ms ab Versand) darf niemand ziehen */
+  holdMs: number;
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -259,8 +296,10 @@ export interface ClientToServerEvents {
   'room:leave': () => void;
   /** Gastgeber: Einstellungen ändern (nicht während einer Partie) */
   'room:settings': (p: Partial<RoomSettings>, ack: (r: Result) => void) => void;
-  /** Gastgeber: Spieler aus der Lobby werfen */
+  /** Gastgeber: Spieler (oder Bot) aus der Lobby werfen */
   'room:kick': (p: { playerId: string }, ack: (r: Result) => void) => void;
+  /** Gastgeber: Bot auf einen freien Platz setzen */
+  'room:addBot': (ack: (r: Result) => void) => void;
   /** Startseite: Liste offener Spiele abonnieren / abbestellen */
   'lobbies:watch': () => void;
   'lobbies:unwatch': () => void;

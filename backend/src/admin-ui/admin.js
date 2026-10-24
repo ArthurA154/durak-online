@@ -208,7 +208,7 @@ function table(r, now) {
       el('li', {
         class: p.connected ? '' : 'away',
         style: `--c:${p.color}`,
-        text: `${p.name}${p.host ? ' ★' : ''}${p.cards != null ? ` · ${p.cards}` : ''}${p.durakCount ? ` · 🃏${p.durakCount}` : ''}`,
+        text: `${p.bot ? '🤖 ' : ''}${p.name}${p.host ? ' ★' : ''}${p.cards != null ? ` · ${p.cards}` : ''}${p.durakCount ? ` · 🃏${p.durakCount}` : ''}`,
       }),
     ),
   );
@@ -400,7 +400,10 @@ function renderGames(games) {
         el('time', { text: isToday(g.at) ? time(g.at) : dayMonth(g.at) }),
         el('span', { class: 'who', text: g.players.join(', ') }),
         el('span', { class: `result ${g.outcome}`, text: g.outcome === 'durak' ? `🃏 ${g.durak}` : RESULT[g.outcome] }),
-        el('span', { class: 'sub', text: `${duration(g.durationMs)} · ${g.players.length} Spieler` }),
+        el('span', {
+          class: 'sub',
+          text: `${duration(g.durationMs)} · ${g.players.length} Spieler${g.bots ? ` · mit ${g.bots} Bot${g.bots > 1 ? 's' : ''}` : ''}`,
+        }),
       ),
     ),
   );

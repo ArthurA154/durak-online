@@ -24,6 +24,11 @@ export function Lobby({ view }: { view: GameView }) {
     call((ack) => socket.emit('room:settings', settings, ack)).catch((e: Error) => setError(e.message));
   };
 
+  const addBot = () => {
+    setError('');
+    call((ack) => socket.emit('room:addBot', ack)).catch((e: Error) => setError(e.message));
+  };
+
   const kick = (playerId: string) => {
     setError('');
     call((ack) => socket.emit('room:kick', { playerId }, ack)).catch((e: Error) => setError(e.message));
@@ -86,7 +91,18 @@ export function Lobby({ view }: { view: GameView }) {
               }
             />
           ) : (
-            <Seat key={pos} pos={pos} empty />
+            <Seat
+              key={pos}
+              pos={pos}
+              empty
+              action={
+                isHost ? (
+                  <button type="button" className="bot-btn" onClick={addBot}>
+                    {t('addBot')}
+                  </button>
+                ) : undefined
+              }
+            />
           );
         })}
       </div>

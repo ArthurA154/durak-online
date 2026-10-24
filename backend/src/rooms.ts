@@ -21,8 +21,14 @@ import {
   type TurnSeconds,
   type GameView,
   type Session,
+  LOOK_EYES,
+  LOOK_HATS,
+  LOOK_MOUTHS,
+  dealDurationMs,
+  drawDurationMs,
 } from '@durak/shared';
 import { DurakGame, GameError } from './game/durak.js';
+import { applyBotMove, botMove } from './game/bot.js';
 
 export interface RoomPlayer {
   id: string;
@@ -36,6 +42,8 @@ export interface RoomPlayer {
   durakCount: number;
   /** Adresse – nur im Speicher, damit Rausgeworfene nicht gleich wieder reinkommen */
   ip: string;
+  /** Vom Server gespielt – gilt immer als verbunden */
+  bot?: boolean;
 }
 
 export interface Room {
@@ -49,6 +57,12 @@ export interface Room {
   deadline: number | null;
   timer: ReturnType<typeof setTimeout> | null;
   timerKind: 'turn' | 'throwIn';
+  /** Nächster Zug eines Bots (kurze Denkpause) */
+  botTimer: ReturnType<typeof setTimeout> | null;
+  /** Bis dann werden noch Karten ausgeteilt/nachgezogen (Animation im Browser) – keine Züge */
+  holdUntil: number;
+  /** Welches Nachziehen schon berücksichtigt ist (DurakGame.drawRound) */
+  seenDraws: number;
   /** Durak der letzten Partie (Narrenkappe, mischt, fängt an) */
   lastDurakId: string | null;
   dealerId: string | null;
@@ -59,6 +73,8 @@ export interface Room {
   /** Start der aktuellen Partie und wer da mitgespielt hat (für die Statistik) */
   gameStartedAt: number | null;
   gamePlayers: string[];
+  /** Wie viele Bots in der aktuellen Partie mitspielen (für die Statistik) */
+  gameBots: number;
   /** Letzte Chat-Nachrichten (nur im Speicher) */
   chat: ChatMessage[];
   settings: RoomSettings;
@@ -76,6 +92,9 @@ export interface RoomEvents {
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const BOT_NAMES = ['🤖 Iwan', '🤖 Olga', '🤖 Pjotr', '🤖 Sweta', '🤖 Mischa'];
+/** Denkpause eines Bots vor seinem Zug – länger als jede Karten-Animation, wirkt wie ein Mensch */
+const BOT_DELAY_MS = [1300, 2200] as const;
 
 let seq = 0;
 
@@ -89,6 +108,10 @@ export function cleanChat(raw: unknown): string {
 }
 
 const isRunning = (room: Room) => !!room.game && !room.game.finished;
+const isHuman = (p: RoomPlayer) => !p.bot;
+/** Verbunden – Bots sind es immer */
+const present = (p: RoomPlayer) => !!p.bot || p.socketId !== null;
+const randomInt = (n: number) => Math.floor(Math.random() * n);
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -131,6 +154,9 @@ export class RoomManager {
       deadline: null,
       timer: null,
       timerKind: 'turn',
+      botTimer: null,
+      holdUntil: 0,
+      seenDraws: 0,
       lastDurakId: null,
       dealerId: null,
       round: 0,
@@ -138,6 +164,7 @@ export class RoomManager {
       createdAt: Date.now(),
       gameStartedAt: null,
       gamePlayers: [],
+      gameBots: 0,
       chat: [],
       settings: {
         public: isPublic,
@@ -166,7 +193,13 @@ export class RoomManager {
     if (!room) throw new GameError('Raum nicht gefunden');
     if (ip && room.banned.has(ip)) throw new GameError('Der Gastgeber hat dich aus diesem Raum entfernt');
     if (isRunning(room)) throw new GameError('Das Spiel läuft bereits');
-    if (room.players.length >= MAX_PLAYERS) throw new GameError('Der Raum ist voll');
+    if (room.players.length >= MAX_PLAYERS) {
+      // Bots halten nur Plätze warm: ein Mensch bekommt den Platz des zuletzt hinzugefügten Bots
+      const bot = [...room.players].reverse().find((p) => p.bot);
+      if (!bot) throw new GameError('Der Raum ist voll');
+      room.players = room.players.filter((p) => p !== bot);
+      room.game = null;
+    }
 
     const player = newPlayer(name, color, socketId, ip, look);
     room.players.push(player);
@@ -240,19 +273,49 @@ export class RoomManager {
     return socketId;
   }
 
+  /** Gastgeber setzt einen Bot auf einen freien Platz (nicht während einer Partie) */
+  addBot(room: Room, byId: string): RoomPlayer {
+    if (room.hostId !== byId) throw new GameError('Nur der Gastgeber kann Bots hinzufügen');
+    if (isRunning(room)) throw new GameError('Erst nach der Partie');
+    if (room.players.length >= MAX_PLAYERS) throw new GameError('Der Raum ist voll');
+    const taken = new Set(room.players.map((p) => p.name));
+    const bot: RoomPlayer = {
+      id: randomUUID(),
+      name: BOT_NAMES.find((n) => !taken.has(n)) ?? '🤖 Bot',
+      token: randomUUID(),
+      socketId: null,
+      awaySince: null,
+      color: randomInt(AVATAR_COLORS.length),
+      look: cleanLook({
+        eyes: randomInt(LOOK_EYES.length),
+        mouth: randomInt(LOOK_MOUTHS.length),
+        hat: randomInt(LOOK_HATS.length),
+      }),
+      durakCount: 0,
+      ip: '',
+      bot: true,
+    };
+    room.players.push(bot);
+    // altes Ergebnisbild passt nicht mehr zu den Spielern
+    room.game = null;
+    return bot;
+  }
+
   /** Öffentliche Räume, die noch auf Spieler warten (keine laufenden oder fertigen Partien) */
   openLobbies(): OpenLobby[] {
     const list: OpenLobby[] = [];
     for (const room of this.rooms.values()) {
       const host = room.players.find((p) => p.id === room.hostId);
       if (!room.settings.public || room.game || !host?.socketId) continue;
-      if (room.players.length >= MAX_PLAYERS) continue;
+      const bots = room.players.filter((p) => p.bot).length;
+      if (room.players.length >= MAX_PLAYERS && bots === 0) continue;
       list.push({
         code: room.code,
         host: host.name,
         color: host.color,
         look: host.look,
         players: room.players.length,
+        bots,
         neighborsOnly: room.settings.neighborsOnly,
         unlimited: room.settings.unlimited,
         transfer: room.settings.transfer,
@@ -263,14 +326,14 @@ export class RoomManager {
 
   /** Mitten im Spiel ist jemand getrennt → keine Züge, Timer steht. */
   isPaused(room: Room): boolean {
-    return isRunning(room) && room.players.some((p) => !p.socketId);
+    return isRunning(room) && room.players.some((p) => !present(p));
   }
 
   start(room: Room, playerId: string): void {
     if (room.hostId !== playerId) throw new GameError('Nur der Gastgeber kann starten');
     if (isRunning(room)) throw new GameError('Das Spiel läuft bereits');
     // Wer gerade nicht verbunden ist, spielt nicht mit
-    room.players = room.players.filter((p) => p.socketId);
+    room.players = room.players.filter(present);
     if (room.lastDurakId && !room.players.some((p) => p.id === room.lastDurakId)) room.lastDurakId = null;
     if (room.players.length < MIN_PLAYERS) throw new GameError(`Mindestens ${MIN_PLAYERS} Spieler nötig`);
     const ids = room.players.map((p) => p.id);
@@ -287,12 +350,28 @@ export class RoomManager {
     room.resultRecorded = false;
     room.gameStartedAt = Date.now();
     room.gamePlayers = room.players.map((p) => p.name);
+    room.gameBots = room.players.filter((p) => p.bot).length;
+    // Erst wenn alle ihre Karten haben, geht es los
+    room.holdUntil = Date.now() + dealDurationMs(room.players.length);
+    room.seenDraws = 0;
     this.events.gameStarted?.(room);
   }
 
-  /** Nach jedem Zug aufrufen: zählt das Ergebnis einer beendeten Partie genau einmal. */
+  /** Wie lange noch ausgeteilt/nachgezogen wird (ms) – so lange zieht niemand */
+  holdMs(room: Room, now = Date.now()): number {
+    return isRunning(room) ? Math.max(0, room.holdUntil - now) : 0;
+  }
+
+  /**
+   * Nach jedem Zug aufrufen: wurde nachgezogen, warten alle, bis die Karten angekommen sind;
+   * eine beendete Partie wird genau einmal gezählt.
+   */
   recordResult(room: Room): void {
     const g = room.game;
+    if (g && g.drawRound !== room.seenDraws) {
+      room.seenDraws = g.drawRound;
+      if (!g.finished) room.holdUntil = Date.now() + drawDurationMs(g.lastDraws);
+    }
     if (!g || !g.finished || room.resultRecorded) return;
     room.resultRecorded = true;
     room.lastDurakId = g.durakId;
@@ -339,8 +418,18 @@ export class RoomManager {
   /** Spieler aus Raum (und ggf. laufender Partie) entfernen. */
   private removePlayer(room: Room, player: RoomPlayer): void {
     room.players = room.players.filter((p) => p !== player);
+    // Letzter Mensch weg → Bots spielen nicht allein weiter, der Raum wird aufgeräumt
+    if (!room.players.some(isHuman)) {
+      if (isRunning(room)) this.events.gameEnded?.(room, 'aborted', null);
+      room.players = [];
+      room.game = null;
+      this.clearTimer(room);
+      this.clearBotTimer(room);
+      this.markIfEmpty(room);
+      return;
+    }
     if (room.lastDurakId === player.id) room.lastDurakId = null;
-    if (room.hostId === player.id && room.players[0]) room.hostId = room.players[0].id;
+    if (room.hostId === player.id) room.hostId = room.players.find(isHuman)!.id;
     if (isRunning(room)) {
       room.game!.removePlayer(player.id);
       this.recordResult(room);
@@ -371,6 +460,7 @@ export class RoomManager {
       if (room.players.length === 0 || (room.emptySince && now - room.emptySince > maxIdleMs)) {
         if (isRunning(room)) this.events.gameEnded?.(room, 'aborted', null);
         this.clearTimer(room);
+        this.clearBotTimer(room);
         this.rooms.delete(code);
       }
     }
@@ -388,7 +478,8 @@ export class RoomManager {
     if (kind === 'throwIn' && room.timerKind === 'throwIn' && room.timer && !this.isPaused(room)) return;
     this.clearTimer(room);
     if (!isRunning(room) || this.isPaused(room)) return;
-    const ms = kind === 'throwIn' ? THROW_IN_MS : room.settings.turnSeconds * 1000;
+    // Die Zugzeit beginnt erst, wenn alle Karten angekommen sind
+    const ms = (kind === 'throwIn' ? THROW_IN_MS : room.settings.turnSeconds * 1000) + this.holdMs(room);
     room.timerKind = kind;
     room.deadline = Date.now() + ms;
     room.timer = setTimeout(() => {
@@ -401,6 +492,45 @@ export class RoomManager {
     }, ms);
   }
 
+  /**
+   * Ist ein Bot dran? Dann nach kurzer Denkpause seinen Zug machen und `after` aufrufen
+   * (Stand senden – danach wird hier erneut geprüft). Immer nur ein Bot-Zug gleichzeitig.
+   */
+  scheduleBot(room: Room, after: () => void, delayMs?: number): void {
+    if (room.botTimer || !isRunning(room) || this.isPaused(room)) return;
+    const g = room.game!;
+    const waiting = g.waitingOn();
+    const bot = room.players.find((p) => p.bot && waiting.includes(p.id));
+    if (!bot) return;
+    const think = delayMs ?? BOT_DELAY_MS[0] + Math.random() * (BOT_DELAY_MS[1] - BOT_DELAY_MS[0]);
+    const ms = this.holdMs(room) + think;
+    room.botTimer = setTimeout(() => {
+      room.botTimer = null;
+      if (room.game !== g || !isRunning(room) || this.isPaused(room)) return;
+      const move = botMove(g, bot.id);
+      if (!move) return after();
+      try {
+        applyBotMove(g, bot.id, move);
+      } catch (err) {
+        if (!(err instanceof GameError)) throw err;
+        // Sollte nicht passieren – dann eben schlucken bzw. fertig sein, damit es weitergeht
+        try {
+          if (bot.id === g.defender.id) g.take(bot.id);
+          else g.pass(bot.id);
+        } catch {
+          /* der Zug-Timer regelt es */
+        }
+      }
+      this.recordResult(room);
+      after();
+    }, ms);
+  }
+
+  clearBotTimer(room: Room): void {
+    if (room.botTimer) clearTimeout(room.botTimer);
+    room.botTimer = null;
+  }
+
   clearTimer(room: Room): void {
     if (room.timer) clearTimeout(room.timer);
     room.timer = null;
@@ -408,7 +538,7 @@ export class RoomManager {
   }
 
   private markIfEmpty(room: Room): void {
-    if (room.players.every((p) => !p.socketId)) room.emptySince ??= Date.now();
+    if (room.players.filter(isHuman).every((p) => !p.socketId)) room.emptySince ??= Date.now();
   }
 }
 
@@ -426,12 +556,13 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
         id: p.id,
         name: p.name,
         cardCount: handOf(p.id).length,
-        connected: p.socketId !== null,
+        connected: present(p),
         out: !!g && !!gp && g.isOut(gp),
         color: p.color,
         look: p.look,
         durakCount: p.durakCount,
         awayMs: !p.socketId && p.awaySince ? now - p.awaySince : null,
+        bot: !!p.bot,
       };
     }),
     hand: [...handOf(playerId)].sort(
@@ -442,7 +573,8 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
     trumpCard: g && g.deck.length > 0 ? g.trumpCard : null,
     deckCount: g?.deck.length ?? 0,
     discardCount: g?.discardCount ?? 0,
-    table: g?.table ?? [],
+    // Spiel vorbei: die letzten Tischkarten bleiben sichtbar (womit es ausging)
+    table: g ? (g.finished ? g.finalTable : g.table) : [],
     attackerId: g && !g.finished ? g.attacker.id : null,
     defenderId: g && !g.finished ? g.defender.id : null,
     taking: g?.taking ?? false,
@@ -460,9 +592,10 @@ export function viewFor(room: Room, playerId: string, now = Date.now()): GameVie
     lastDurakId: room.lastDurakId,
     dealerId: room.dealerId,
     round: room.round,
-    paused: isRunning(room) && room.players.some((p) => !p.socketId),
+    paused: isRunning(room) && room.players.some((p) => !present(p)),
     settings: { ...room.settings },
     throwers: g && !g.finished ? g.throwers().map((p) => p.id) : [],
+    holdMs: isRunning(room) ? Math.max(0, room.holdUntil - now) : 0,
   };
 }
 

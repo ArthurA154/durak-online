@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { beats, MAX_TABLE, sameCard, type Card, type GameView, type Result } from '@durak/shared';
 import { CardBack, CardFace, cardKey, isRed, suitSymbol } from './CardView';
@@ -17,7 +17,7 @@ import { t } from './i18n';
 import { Finished } from './Finished';
 import { PauseOverlay } from './PauseOverlay';
 import { FlyCard, FlySlot, GhostPair, tilt, type Ghost } from './TableCards';
-import { SHUFFLE_MS, isFreshDeal, useDrawSequence } from './dealing';
+import { RESULT_DELAY_MS, SHUFFLE_MS, isFreshDeal, useDrawSequence } from './dealing';
 
 const spring = { type: 'spring', stiffness: 380, damping: 32 } as const;
 
@@ -97,6 +97,25 @@ export function Table({ view }: { view: GameView }) {
   // Spiel im Hintergrund-Tab und ich bin dran → Tab-Titel blinkt
   useTabAlert(turn.mine && !view.paused && !finished, t('tabYourTurn'));
   const countdown = useCountdown(view);
+
+  // Karten werden noch ausgeteilt/nachgezogen → noch niemand darf ziehen (der Server wartet genauso)
+  const holdUntil = useMemo(() => Date.now() + view.holdMs, [view]);
+  const [, wake] = useState(0);
+  useEffect(() => {
+    const left = holdUntil - Date.now();
+    if (left <= 0) return;
+    const t = setTimeout(() => wake((n) => n + 1), left + 20);
+    return () => clearTimeout(t);
+  }, [holdUntil]);
+  const holding = Date.now() < holdUntil;
+
+  // Spiel vorbei: erst die letzten Karten zeigen, dann das Ergebnis
+  const [resultShown, setResultShown] = useState(finished);
+  useEffect(() => {
+    if (!finished) return setResultShown(false);
+    const t = setTimeout(() => setResultShown(true), RESULT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [finished]);
   const timedFor = (id: string) => (countdown?.waitingOn.includes(id) ? countdown : null);
   const myCountdown = timedFor(me);
 
@@ -229,7 +248,10 @@ export function Table({ view }: { view: GameView }) {
 
   /** Kann diese Karte jetzt etwas Sinnvolles tun? (kennt die Regeln – nur für die Spielhilfen) */
   const fits = (c: Card) =>
-    !finished && !view.paused && (isDefender ? defendTargets(c).length > 0 || canTransferWith(c) : canAttackWith(c));
+    !finished &&
+    !view.paused &&
+    !holding &&
+    (isDefender ? defendTargets(c).length > 0 || canTransferWith(c) : canAttackWith(c));
 
   // Spielhilfen aus: nichts leuchtet, man darf es mit jeder Karte versuchen, sobald man überhaupt dran ist.
   // Was nicht passt, lehnt der Server ab – die Karte bleibt in der Hand.
@@ -237,6 +259,7 @@ export function Table({ view }: { view: GameView }) {
   const myMove =
     !finished &&
     !view.paused &&
+    !holding &&
     (isDefender
       ? !view.taking && undefended > 0
       : view.table.length === 0
@@ -631,10 +654,10 @@ export function Table({ view }: { view: GameView }) {
           />
         ))}
 
-        {finished && <Finished view={view} />}
+        {finished && resultShown && <Finished view={view} />}
       </div>
 
-      <section className={`me${turn.mine ? ' my-turn' : ''}`}>
+      <section className={`me${turn.mine && !holding ? ' my-turn' : ''}`}>
         {!finished && !dealing && attacker && defender && (
           <div className="duel" aria-live="polite">
             <DuelSide
@@ -681,7 +704,7 @@ export function Table({ view }: { view: GameView }) {
             </p>
           ) : (
             <p className="turn-text" aria-live="polite">
-              {turn.mine && !dealing && !view.paused && <span className="your-turn">{t('yourTurn')}</span>}
+              {turn.mine && !holding && !view.paused && <span className="your-turn">{t('yourTurn')}</span>}
               {dealing ? '' : view.paused ? t('pausedWait') : turn.echo ? '' : turn.text}
             </p>
           )}

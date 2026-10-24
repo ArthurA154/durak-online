@@ -12,6 +12,7 @@ describe('Zug-Timer im Raum', () => {
     const { room } = rooms.create('Anna', 0, 's1');
     rooms.join(room.code, 'Ben', 1, 's2');
     rooms.start(room, room.hostId);
+    room.holdUntil = 0; // Austeilen überspringen (eigener Test unten)
     return { rooms, room };
   }
 
@@ -32,6 +33,7 @@ describe('Zug-Timer im Raum', () => {
     rooms.join(room.code, 'Ben', 1, 's2');
     rooms.updateSettings(room, room.hostId, { turnSeconds: 15 });
     rooms.start(room, room.hostId);
+    room.holdUntil = 0;
     rooms.armTimer(room, () => {});
     expect(viewFor(room, room.hostId).timer).toMatchObject({ totalMs: 15_000 });
     vi.advanceTimersByTime(14_999);
@@ -275,6 +277,7 @@ describe('Öffentliche Räume und Einstellungen', () => {
         color: 0,
         look: { eyes: 0, mouth: 0, hat: 0 },
         players: 1,
+        bots: 0,
         neighborsOnly: false,
         unlimited: false,
         transfer: true,
@@ -356,5 +359,117 @@ describe('Alle anderen sind weg', () => {
     expect(viewFor(room, b.playerId).phase).toBe('lobby');
     expect(room.hostId).toBe(b.playerId);
     expect(rooms.join(room.code, 'Anna', 0, 's3').room).toBe(room);
+  });
+});
+
+describe('Bots', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('nur der Gastgeber setzt Bots, höchstens bis der Raum voll ist', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const b = rooms.join(room.code, 'Ben', 1, 's2').session;
+    expect(() => rooms.addBot(room, b.playerId)).toThrow('Nur der Gastgeber');
+    rooms.addBot(room, session.playerId);
+    rooms.addBot(room, session.playerId);
+    expect(room.players.map((p) => p.name)).toEqual(['Anna', 'Ben', '🤖 Iwan', '🤖 Olga']);
+    expect(() => rooms.addBot(room, session.playerId)).toThrow('voll');
+    // Bot wieder rauswerfen geht wie bei Menschen
+    rooms.kickFromLobby(room, session.playerId, room.players[3].id);
+    expect(room.players).toHaveLength(3);
+  });
+
+  it('allein mit Bots spielen: Bots gelten als verbunden und ziehen von selbst', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const bot = rooms.addBot(room, session.playerId);
+    rooms.start(room, session.playerId);
+    room.holdUntil = 0;
+    expect(room.players).toHaveLength(2); // Bot bleibt beim Start dabei
+    expect(rooms.isPaused(room)).toBe(false);
+    const view = viewFor(room, session.playerId);
+    expect(view.players.find((p) => p.id === bot.id)).toMatchObject({ bot: true, connected: true });
+    // Ist der Bot dran, zieht er nach der Denkpause
+    const g = room.game!;
+    const botWaits = () => g.waitingOn().includes(bot.id);
+    let moved = 0;
+    for (let i = 0; i < 400 && !g.finished; i++) {
+      if (botWaits()) {
+        rooms.scheduleBot(room, () => moved++, 10);
+        vi.advanceTimersByTime(30_000); // inkl. Warten aufs Nachziehen
+      } else {
+        g.timeout(); // ich „verpenne“ – schluckt bzw. legt die kleinste Karte
+      }
+    }
+    expect(moved).toBeGreaterThan(0);
+    expect(g.finished).toBe(true);
+  });
+
+  it('ein Mensch bekommt den Platz eines Bots, wenn der Raum voll ist', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1', true);
+    rooms.addBot(room, session.playerId);
+    rooms.addBot(room, session.playerId);
+    rooms.addBot(room, session.playerId);
+    expect(rooms.openLobbies()[0]).toMatchObject({ players: 4, bots: 3 });
+    rooms.join(room.code, 'Ben', 1, 's2');
+    expect(room.players.map((p) => p.name)).toEqual(['Anna', '🤖 Iwan', '🤖 Olga', 'Ben']);
+  });
+
+  it('geht der letzte Mensch, verschwinden auch die Bots', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    rooms.addBot(room, session.playerId);
+    rooms.start(room, session.playerId);
+    rooms.leave(room, session.playerId, 's1');
+    expect(room.players).toEqual([]);
+    expect(room.game).toBeNull();
+    expect(rooms.cleanup(30 * 60 * 1000)).toEqual([]);
+    expect(rooms.get(room.code)).toBeUndefined();
+  });
+});
+
+describe('Warten, bis die Karten verteilt sind', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('nach dem Start und nach dem Nachziehen zieht niemand, Zugzeit beginnt danach', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    rooms.join(room.code, 'Ben', 1, 's2');
+    rooms.start(room, session.playerId);
+    const deal = rooms.holdMs(room);
+    expect(deal).toBeGreaterThan(3000); // Mischen + 12 Karten austeilen
+    expect(viewFor(room, session.playerId).holdMs).toBe(deal);
+    rooms.armTimer(room, () => {});
+    expect(viewFor(room, session.playerId).timer!.remainingMs).toBe(deal + TURN_MS);
+    vi.advanceTimersByTime(deal);
+    expect(rooms.holdMs(room)).toBe(0);
+
+    // Runde zu Ende (Verteidiger schluckt, Angreifer fertig) → nachgezogen → wieder warten
+    const g = room.game!;
+    g.attack(g.attacker.id, g.attacker.hand[0]);
+    g.take(g.defender.id);
+    g.pass(g.attacker.id);
+    rooms.recordResult(room);
+    expect(rooms.holdMs(room)).toBeGreaterThan(1000);
+  });
+
+  it('ein Bot wartet auch, bis ausgeteilt ist', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const bot = rooms.addBot(room, session.playerId);
+    rooms.start(room, session.playerId);
+    const g = room.game!;
+    g.attackerIdx = g.players.findIndex((p) => p.id === bot.id);
+    g.defenderIdx = 1 - g.attackerIdx;
+    let moved = false;
+    rooms.scheduleBot(room, () => (moved = true), 10);
+    vi.advanceTimersByTime(rooms.holdMs(room) - 1);
+    expect(moved).toBe(false);
+    vi.advanceTimersByTime(20);
+    expect(moved).toBe(true);
+    expect(g.table).toHaveLength(1);
   });
 });

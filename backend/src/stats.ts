@@ -29,6 +29,8 @@ export interface GameRecord {
   at: number;
   durationMs: number;
   players: string[];
+  /** Wie viele davon Bots waren (fehlt bei alten Einträgen) */
+  bots?: number;
   durak: string | null;
   outcome: GameOutcome;
 }

@@ -50,6 +50,11 @@ export class DurakGame {
   passed = new Set<string>();
   finished = false;
   durakId: string | null = null;
+  /** Die letzten Tischkarten, wenn das Spiel endet – damit man sieht, womit es ausging */
+  finalTable: TablePair[] = [];
+  /** Wer zuletzt nachgezogen hat (eine ID pro Karte, in Reihenfolge) und wie oft schon */
+  lastDraws: string[] = [];
+  drawRound = 0;
   /** Nachlegen nur für die beiden Nachbarn des Verteidigers (sonst alle) */
   readonly neighborsOnly: boolean;
   /** Höchstzahl Angriffskarten pro Runde (Standard 6; „unbegrenzt“ = nur durch die Hand des Verteidigers) */
@@ -281,6 +286,7 @@ export class DurakGame {
     if (this.deck.length === 0 && this.players.filter((p) => p.hand.length > 0).length <= 1 && !this.canStillDraw()) {
       const cards = this.table.reduce((n, t) => n + (t.defense ? 2 : 1), 0);
       this.discardCount += cards;
+      this.finalTable = this.table;
       this.table = [];
       this.taking = false;
       this.passed.clear();
@@ -308,12 +314,16 @@ export class DurakGame {
     if (tookCards) this.defender.hand.push(...cards);
     else this.discardCount += cards.length;
 
+    const lastTable = this.table;
     this.table = [];
     this.taking = false;
     this.passed.clear();
     this.refillHands();
 
-    if (this.finishIfOver()) return;
+    if (this.finishIfOver()) {
+      this.finalTable = lastTable;
+      return;
+    }
 
     this.attackerIdx = tookCards ? this.nextActive(this.defenderIdx) : this.firstActiveFrom(this.defenderIdx);
     this.defenderIdx = this.nextActive(this.attackerIdx);
@@ -356,8 +366,16 @@ export class DurakGame {
       if (p !== this.defender) order.push(p);
     }
     order.push(this.defender);
+    const draws: string[] = [];
     for (const p of order) {
-      while (p.hand.length < HAND_SIZE && this.deck.length > 0) p.hand.push(this.deck.pop()!);
+      while (p.hand.length < HAND_SIZE && this.deck.length > 0) {
+        p.hand.push(this.deck.pop()!);
+        draws.push(p.id);
+      }
+    }
+    if (draws.length) {
+      this.lastDraws = draws;
+      this.drawRound++;
     }
   }
 

@@ -58,6 +58,7 @@ const rooms = new RoomManager({
       at: Date.now(),
       durationMs: room.gameStartedAt ? Date.now() - room.gameStartedAt : 0,
       players: room.gamePlayers,
+      bots: room.gameBots,
       durak,
       outcome,
     }),
@@ -110,6 +111,11 @@ function broadcast(room: Room): void {
   for (const p of room.players) {
     if (p.socketId) io.to(p.socketId).emit('state', viewFor(room, p.id));
   }
+  // Ist ein Bot dran, zieht er nach kurzer Denkpause – danach wieder senden
+  rooms.scheduleBot(room, () => {
+    armTimer(room);
+    broadcast(room);
+  });
 }
 
 function fail(err: unknown): { ok: false; error: string } {
@@ -267,6 +273,7 @@ io.on('connection', (socket: IoSocket) => {
   on('room:settings', (raw, ack) =>
     inRoom(socket, ack as (r: Result) => void, (room, id) => rooms.updateSettings(room, id, obj(raw))),
   );
+  on('room:addBot', (ack) => inRoom(socket, ack as (r: Result) => void, (room, id) => void rooms.addBot(room, id)));
   on('room:kick', (raw, ack) =>
     inRoom(socket, ack as (r: Result) => void, (room, id) => {
       const kickedSocket = rooms.kickFromLobby(room, id, String(obj(raw).playerId ?? ''));
@@ -346,6 +353,7 @@ io.on('connection', (socket: IoSocket) => {
   function requireGame(room: Room) {
     if (!room.game) throw new GameError('Das Spiel wurde noch nicht gestartet');
     if (rooms.isPaused(room)) throw new GameError('Pause – warte, bis alle wieder da sind');
+    if (rooms.holdMs(room) > 0) throw new GameError('Warte, bis die Karten verteilt sind');
     return room.game;
   }
 });
@@ -430,7 +438,8 @@ const admin = createAdmin({
         players: r.players.map((p) => ({
           name: p.name,
           color: AVATAR_COLORS[p.color] ?? AVATAR_COLORS[0],
-          connected: !!p.socketId,
+          connected: !!p.socketId || !!p.bot,
+          bot: !!p.bot,
           host: p.id === r.hostId,
           cards: r.game?.players.find((g) => g.id === p.id)?.hand.length ?? null,
           durakCount: p.durakCount,

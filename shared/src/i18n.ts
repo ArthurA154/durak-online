@@ -33,6 +33,14 @@ export const SERVER_ERRORS: Record<string, Other> = {
   'Nicht auf dich selbst': { en: 'Not at yourself', ru: 'Не в себя' },
   'Nur der Gastgeber kann das ändern': { en: 'Only the host can change that', ru: 'Это может изменить только хозяин' },
   'Erst nach der Partie': { en: 'Only after the game', ru: 'Только после партии' },
+  'Warte, bis die Karten verteilt sind': {
+    en: 'Wait until the cards are dealt',
+    ru: 'Подожди, пока раздадут карты',
+  },
+  'Nur der Gastgeber kann Bots hinzufügen': {
+    en: 'Only the host can add bots',
+    ru: 'Добавлять ботов может только хозяин',
+  },
   'Nur der Gastgeber kann Spieler entfernen': {
     en: 'Only the host can remove players',
     ru: 'Удалять игроков может только хозяин',

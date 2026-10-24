@@ -1,23 +1,24 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { HAND_SIZE, type GameView } from '@durak/shared';
+import {
+  DEAL_FLY_MS,
+  DEAL_STEP_MS,
+  DRAW_DELAY_MS,
+  DRAW_FLY_MS,
+  HAND_SIZE,
+  SHUFFLE_MS,
+  drawTimes,
+  type GameView,
+} from '@durak/shared';
 import { centerOf, pointOf, seatPoint, type Point } from './fly';
 import { sfx } from './audio';
 
 // Mischen, Austeilen und Nachziehen: wer bekommt wann welche Karte (nur Optik – der Server hat längst verteilt).
 
-/** So lange dauert das Mischen, bevor ausgeteilt wird */
-export const SHUFFLE_MS = 1500;
+// Die Zeiten liegen in shared – der Server wartet genau so lange, bevor jemand ziehen darf.
+export { SHUFFLE_MS };
 
-/** Nachziehen Spieler für Spieler: Abstand zwischen den Karten eines Spielers … */
-const DRAW_CARD_MS = 300;
-/** … und Pause, bevor der nächste Spieler dran ist */
-const DRAW_PLAYER_GAP_MS = 550;
-/** Erst warten, bis die alten Tischkarten weggeflogen sind (Ablage oder zum Schlucker) */
-const DRAW_DELAY_MS = 650;
-const DRAW_FLY_MS = 600;
-/** Austeilen zu Beginn: zügiger, wie beim echten Geben */
-const DEAL_STEP_MS = 220;
-const DEAL_FLY_MS = 450;
+/** Spiel vorbei: so lange sieht man noch den Tisch (womit es ausging), dann kommt das Ergebnis */
+export const RESULT_DELAY_MS = 2200;
 
 /**
  * Runde vorbei und nachgezogen? Dann: wer bekommt in welcher Reihenfolge wie viele Karten.
@@ -90,15 +91,6 @@ interface Sequence {
 /** Gleichmäßig (Austeilen) */
 const evenly = (steps: string[], step: number) => steps.map((_, i) => i * step);
 
-/** Nachziehen: Karten eines Spielers kurz hintereinander, dann Pause bis zum nächsten Spieler */
-function byPlayer(steps: string[]): number[] {
-  let t = 0;
-  return steps.map((id, i) => {
-    if (i > 0) t += id === steps[i - 1] ? DRAW_CARD_MS : DRAW_PLAYER_GAP_MS;
-    return t;
-  });
-}
-
 /**
  * Austeilen (neue Partie, nach dem Mischen) und Nachziehen (nach der Runde) Karte für Karte.
  * Liefert, welche Karten noch „unterwegs“ sind – damit Fächer und Stapel erst beim Ankommen zählen.
@@ -120,7 +112,7 @@ export function useDrawSequence(
       ? Array.from({ length: HAND_SIZE }, () => view.players.map((p) => p.id)).flat()
       : null;
   if (newDraws)
-    seq.current = { steps: newDraws, start: Date.now() + DRAW_DELAY_MS, at: byPlayer(newDraws), fly: DRAW_FLY_MS };
+    seq.current = { steps: newDraws, start: Date.now() + DRAW_DELAY_MS, at: drawTimes(newDraws), fly: DRAW_FLY_MS };
   if (newDeal)
     seq.current = {
       steps: newDeal,

@@ -191,6 +191,8 @@ describe('Spielende', () => {
     expect(g.finished).toBe(true);
     expect(g.durakId).toBe('b');
     expect(g.table).toEqual([]);
+    // Die letzte Karte bleibt zum Anschauen
+    expect(g.finalTable).toEqual([{ attack: c(7, 'S'), defense: null, by: 'a' }]);
   });
 
   it('Unentschieden: letzte Karte wird mit der letzten Karte geschlagen', () => {
@@ -204,6 +206,7 @@ describe('Spielende', () => {
     g.defend('b', 0, c(9, 'S'));
     expect(g.finished).toBe(true);
     expect(g.durakId).toBeNull();
+    expect(g.finalTable).toEqual([{ attack: c(7, 'S'), defense: c(9, 'S'), by: 'a' }]);
   });
 
   it('Unentschieden möglich, aber geschluckt → Durak', () => {
