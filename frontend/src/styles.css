@@ -1077,50 +1077,13 @@ input:focus {
 }
 
 .seat.is-attacker .avatar {
-  box-shadow:
-    0 0 0 4px var(--yellow),
-    0 0 26px rgba(255, 210, 63, 0.7);
-  animation: pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 4px var(--yellow);
 }
 
 .seat.is-defender .avatar {
   box-shadow:
     0 0 0 4px var(--red),
     0 6px 14px rgba(0, 0, 0, 0.45);
-}
-
-/* Aura um den Verteidiger: rotes Leuchten hinter der Figur, atmet langsam */
-.seat.is-defender .avatar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: 50%;
-  box-shadow:
-    0 0 calc(var(--av) * 0.35) calc(var(--av) * 0.16) rgba(255, 81, 72, 0.85),
-    0 0 calc(var(--av) * 0.9) calc(var(--av) * 0.3) rgba(255, 81, 72, 0.4);
-  pointer-events: none;
-  animation: aura 2.8s ease-in-out infinite;
-}
-
-@keyframes aura {
-  50% {
-    opacity: 0.6;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .seat.is-defender .avatar::before {
-    animation: none;
-  }
-}
-
-@keyframes pulse {
-  50% {
-    box-shadow:
-      0 0 0 4px var(--yellow),
-      0 0 8px rgba(255, 210, 63, 0.3);
-  }
 }
 
 .avatar-badge {
@@ -1244,56 +1207,10 @@ input:focus {
   color: #fff;
 }
 
-/* Pfeil Angreifer → Verteidiger, unter den Karten */
-.attack-arrow {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.attack-arrow-shape {
-  animation: arrow-in 0.35s ease-out both;
-}
-
-.attack-arrow path {
-  fill: none;
-  stroke-linecap: round;
-}
-
-.attack-arrow-shadow {
-  stroke: rgba(0, 0, 0, 0.28);
-  stroke-width: 11;
-}
-
-.attack-arrow-line {
-  stroke-width: 6;
-}
-
-.attack-arrow polygon {
-  fill: var(--red);
-  stroke: rgba(0, 0, 0, 0.28);
-  stroke-width: 2;
-  stroke-linejoin: round;
-}
-
-@keyframes arrow-in {
-  from {
-    opacity: 0;
-  }
-}
-
-/* Ich muss verteidigen: Hinweis groß und rot, rote Linie über der Hand */
-.me.must-defend .turn-text {
-  color: var(--red);
-  font-size: 1.15rem;
-}
-
-.me.must-defend .hand {
-  background: linear-gradient(to bottom, rgba(255, 81, 72, 0.16), transparent 70%);
-  box-shadow: inset 0 3px 0 rgba(255, 81, 72, 0.75);
+/* Ich bin dran (angreifen, verteidigen oder nachlegen): immer dasselbe Zeichen – gelbe Linie über der Hand */
+.me.my-turn .hand {
+  background: linear-gradient(to bottom, rgba(255, 210, 63, 0.12), transparent 70%);
+  box-shadow: inset 0 3px 0 var(--yellow);
   border-radius: 24px 24px 0 0;
 }
 
@@ -1848,7 +1765,75 @@ input:focus {
 }
 
 .me.my-turn .turn-text {
-  color: var(--yellow);
+  color: var(--text);
+}
+
+.your-turn {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #2a2100;
+  font-weight: 900;
+  vertical-align: 1px;
+}
+
+/* Wer gegen wen: „Vika greift an → Du verteidigst“ */
+.duel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 auto 2px;
+  font-size: 0.95rem;
+}
+
+.duel-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 0 0 2px var(--side);
+}
+
+.duel-side.attack {
+  --side: var(--yellow);
+}
+
+.duel-side.defend,
+.duel-side.take {
+  --side: var(--red);
+}
+
+.duel-side .avatar.tiny {
+  width: 26px;
+  height: 26px;
+}
+
+.duel-role {
+  color: var(--side);
+  font-weight: 800;
+}
+
+.duel-side.take .duel-role {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+}
+
+.duel-arrow {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .actions {
@@ -2018,10 +2003,13 @@ input:focus {
     font-size: 0.8rem;
   }
 
+  /* Fächer oben neben die Figur – darunter steht die Plakette „greift an“ */
   .pos-top .seat-fan,
   .pos-top-left .seat-fan,
   .pos-top-right .seat-fan {
-    top: 80px;
+    top: 6px;
+    left: calc(50% + 30px);
+    translate: 0 0;
   }
 
   .pos-left .seat-fan {
@@ -2099,6 +2087,7 @@ input:focus {
   .turn-text {
     grid-column: 1 / -1;
     grid-row: 2;
+    min-height: 1.4em;
     font-size: 0.9rem;
   }
 
@@ -2116,7 +2105,6 @@ input:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .seat.is-attacker .avatar,
   .table-card.target::after,
   .hero-card,
   .my-timer-num {
@@ -3191,11 +3179,11 @@ input:focus {
    Breite hängt auch an der Höhe, damit der Tisch nicht zu lang gezogen wird. */
 @media (min-width: 1280px) and (min-height: 760px) {
   :root {
-    --base-cw: clamp(84px, min(5.8vw, 11.5vh), 116px);
+    --base-cw: clamp(84px, min(6.4vw, 12vh), 128px);
     --mini-w: 42px;
     --av: 72px;
     /* Tischbreite: wächst mit dem Bildschirm, aber höchstens doppelt so breit wie die freie Höhe (nicht zu lang gezogen) */
-    --arena-w: min(1440px, 100vw, max(1100px, calc((100dvh - 330px) * 2)));
+    --arena-w: min(1440px, 100vw, max(860px, calc((100dvh - 330px) * 2)));
   }
 
   .arena,
@@ -3213,7 +3201,7 @@ input:focus {
   }
 
   .play-area {
-    --cw: clamp(40px, min(var(--base-cw), calc((100dvh - 460px) / 1.9)), 110px);
+    --cw: clamp(40px, min(var(--base-cw), calc((100dvh - 460px) / 1.9)), 136px);
   }
 
   .play-area.two-rows {
@@ -3288,6 +3276,55 @@ input:focus {
 }
 
 /* Sehr große Bildschirme (z. B. 2560 px): noch eine Stufe größer */
+/* Schmale Handys: Fächer links und rechts weg – sie lägen auf den Tischkarten.
+   Wie viele Karten jemand hat, steht ohnehin als Zahl an der Figur. */
+@media (max-width: 480px) {
+  .pos-left .seat-fan,
+  .pos-right .seat-fan {
+    display: none;
+  }
+}
+
+/* PC/Laptop mit wenig Höhe: der Tisch wird flach – Fächer des Gegners oben neben die Figur statt auf den Tisch */
+@media (min-width: 701px) and (max-height: 860px) {
+  /* Tisch nicht in die Länge ziehen – höchstens gut doppelt so breit wie die freie Höhe */
+  .arena,
+  .me {
+    width: min(1100px, 100%, max(700px, calc((100dvh - 200px) * 1.9)));
+  }
+
+  /* Hand ohne großen Leerraum darüber und darunter – die Höhe bekommt der Tisch */
+  .topbar {
+    padding-block: 6px;
+  }
+
+  .arena > .felt {
+    inset: 66px 96px 12px;
+  }
+
+  .play-area {
+    --cw: clamp(40px, min(calc(var(--base-cw) * 1.25), calc((100dvh - 400px) / 1.9)), 110px);
+  }
+
+  .me {
+    padding-top: 2px;
+  }
+
+  .hand {
+    height: calc(var(--cw) * 1.42 + 24px);
+    padding-top: 4px;
+    padding-bottom: 0;
+  }
+
+  .pos-top .seat-fan,
+  .pos-top-left .seat-fan,
+  .pos-top-right .seat-fan {
+    top: 30px;
+    left: calc(50% + 58px);
+    translate: 0 0;
+  }
+}
+
 @media (min-width: 2200px) and (min-height: 1100px) {
   :root {
     --base-cw: clamp(110px, min(5.6vw, 11.5vh), 140px);
@@ -3296,7 +3333,7 @@ input:focus {
   }
 
   :root {
-    --arena-w: min(1900px, 100vw, max(1100px, calc((100dvh - 380px) * 2)));
+    --arena-w: min(1900px, 100vw, max(860px, calc((100dvh - 380px) * 2)));
   }
 
   .play-area {

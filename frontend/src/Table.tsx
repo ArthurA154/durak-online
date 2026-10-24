@@ -3,7 +3,6 @@ import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { beats, MAX_TABLE, sameCard, type Card, type GameView, type Result } from '@durak/shared';
 import { CardBack, CardFace, cardKey, isRed, suitSymbol } from './CardView';
 import { SuitIcon } from './SuitIcon';
-import { AttackArrow } from './AttackArrow';
 import { setCustomOrder, sortHand, useHandSort } from './handSort';
 import { useTabAlert } from './useTabAlert';
 import { Seat, opponentPositions } from './Seat';
@@ -391,6 +390,8 @@ export function Table({ view }: { view: GameView }) {
   // Schlucken soll man sofort sehen: Stempel auf dem Tisch, roter Ring am Platz
   const taking = view.taking && !finished && !dealing;
   const defenderName = view.players.find((p) => p.id === view.defenderId)?.name ?? '';
+  const attacker = view.players.find((p) => p.id === view.attackerId);
+  const defender = view.players.find((p) => p.id === view.defenderId);
   const opponents = rotateFrom(view.players, me).filter((p) => p.id !== me);
   const positions = opponentPositions(opponents.length);
   // Eigene Reihenfolge (nur auf diesem Gerät): nach Wert, nach Farbe oder selbst hingezogen
@@ -398,8 +399,14 @@ export function Table({ view }: { view: GameView }) {
   const n = hand.length;
   // Hand auffächern: ganze Breite nutzen; passt es nicht mehr lesbar, zwei Reihen
   const cw = handCw.current;
-  const fitStep = (count: number) => (count <= 1 ? cw : (Math.max(handW, cw * 3) - cw - 16) / (count - 1));
-  const twoRows = n > 1 && handW > 0 && fitStep(n) < cw * 0.3;
+  /** Fächer: wie stark die äußeren Karten gedreht sind (Grad) – bei vielen Karten flacher */
+  const rotFor = (count: number) => (count <= 8 ? Math.min(12, 2.2 * count) : Math.max(3, 12 - (count - 8) * 0.6));
+  /** So weit schwingen die äußeren Karten durch die Drehung nach außen (Drehpunkt weit unter der Karte) */
+  const swing = (count: number) => cw * 2.3 * Math.sin((rotFor(count) * Math.PI) / 180);
+  const fitStep = (count: number) =>
+    count <= 1 ? cw : (Math.max(handW, cw * 3) - cw - 16 - 2 * swing(count)) / (count - 1);
+  // zwei Reihen, sobald von jeder Karte weniger als ihre Ecke (Wert + Farbe) sichtbar wäre
+  const twoRows = n > 1 && handW > 0 && fitStep(n) < cw * 0.42;
   const half = Math.ceil(n / 2);
   const handRows = twoRows ? [hand.slice(0, half), hand.slice(half)] : [hand];
 
@@ -446,14 +453,6 @@ export function Table({ view }: { view: GameView }) {
     <main className="game">
       <div className={`arena${dealing ? ' dealing' : ''}`}>
         <div className="felt">
-          {!finished && !dealing && (
-            <AttackArrow
-              me={me}
-              attackerId={view.attackerId}
-              defenderId={view.defenderId}
-              layoutKey={view.players.map((p) => (p.out ? 'x' : 'o')).join('')}
-            />
-          )}
           <div
             className="deck"
             ref={deckRef}
@@ -635,7 +634,30 @@ export function Table({ view }: { view: GameView }) {
         {finished && <Finished view={view} />}
       </div>
 
-      <section className={`me${turn.mine ? ' my-turn' : ''}${turn.mine && isDefender ? ' must-defend' : ''}`}>
+      <section className={`me${turn.mine ? ' my-turn' : ''}`}>
+        {!finished && !dealing && attacker && defender && (
+          <div className="duel" aria-live="polite">
+            <DuelSide
+              player={attacker}
+              me={me}
+              role={attacker.id === me ? t('youAttack') : t('attacks')}
+              kind="attack"
+              view={view}
+            />
+            <svg className="duel-arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12h15M13 6l6 6-6 6" />
+            </svg>
+            <DuelSide
+              player={defender}
+              me={me}
+              role={
+                defender.id === me ? t(view.taking ? 'youTake' : 'youDefend') : t(view.taking ? 'takes' : 'defends')
+              }
+              kind={view.taking ? 'take' : 'defend'}
+              view={view}
+            />
+          </div>
+        )}
         <div className="me-bar">
           <div
             className={`me-chip${isAttacker ? ' is-attacker' : ''}${isDefender ? ' is-defender' : ''}${taking && isDefender ? ' is-taking' : ''}`}
@@ -659,7 +681,8 @@ export function Table({ view }: { view: GameView }) {
             </p>
           ) : (
             <p className="turn-text" aria-live="polite">
-              {dealing ? '' : view.paused ? t('pausedWait') : turn.text}
+              {turn.mine && !dealing && !view.paused && <span className="your-turn">{t('yourTurn')}</span>}
+              {dealing ? '' : view.paused ? t('pausedWait') : turn.echo ? '' : turn.text}
             </p>
           )}
           {!finished && (
@@ -703,7 +726,7 @@ export function Table({ view }: { view: GameView }) {
               {row.map((card, i) => {
                 const len = row.length;
                 const u = len > 1 ? (i - (len - 1) / 2) / ((len - 1) / 2) : 0; // −1 … 1
-                const maxRot = len <= 8 ? Math.min(12, 2.2 * len) : Math.max(3, 12 - (len - 8) * 0.6);
+                const maxRot = rotFor(len);
                 const step = Math.min(cw * 0.78, Math.max(cw * 0.3, fitStep(len)));
                 // Lücke beim Umsortieren: die Karten zwischen alter und neuer Stelle rücken um einen Platz
                 const idx = r === 0 ? i : half + i;
@@ -806,7 +829,33 @@ export function Table({ view }: { view: GameView }) {
   );
 }
 
-/** Kopie eines Tischpaars, die zur Ablage oder zum schluckenden Spieler fliegt und dann verschwindet. */
+/** Eine Seite der Zeile „Wer gegen wen“: kleine Figur, Name (bei mir „Du“) und Rolle */
+function DuelSide(props: {
+  player: GameView['players'][number];
+  me: string;
+  role: string;
+  kind: 'attack' | 'defend' | 'take';
+  view: GameView;
+}) {
+  const { player: p, me } = props;
+  const you = t('you');
+  return (
+    <span className={`duel-side ${props.kind}`}>
+      <span className="avatar tiny">
+        <Avatar
+          color={p.color}
+          look={p.look}
+          expression={expressionFor(props.view, p.id)}
+          hat={p.id === props.view.lastDurakId}
+          seed={p.id}
+        />
+      </span>
+      <b>{p.id === me ? you.charAt(0).toUpperCase() + you.slice(1) : p.name}</b>
+      <span className="duel-role">{props.role}</span>
+    </span>
+  );
+}
+
 function rotateFrom<T extends { id: string }>(list: T[], id: string): T[] {
   const i = list.findIndex((x) => x.id === id);
   return i < 0 ? list : [...list.slice(i), ...list.slice(0, i)];

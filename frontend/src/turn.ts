@@ -3,8 +3,11 @@ import { t } from './i18n';
 
 const nameOf = (view: GameView, id: string | null) => view.players.find((p) => p.id === id)?.name ?? '?';
 
-/** Wer ist gerade dran und was ist zu tun? `mine` = ich muss etwas machen. */
-export function turnInfo(view: GameView): { text: string; mine: boolean } {
+/**
+ * Wer ist gerade dran und was ist zu tun? `mine` = ich muss etwas machen.
+ * `echo` = sagt nur, wer angreift/verteidigt – das zeigt schon die Zeile „Wer gegen wen“.
+ */
+export function turnInfo(view: GameView): { text: string; mine: boolean; echo?: boolean } {
   const me = view.you;
   const name = (id: string | null) => nameOf(view, id);
   const isDefender = view.defenderId === me;
@@ -19,6 +22,7 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
       : {
           text: t(isDefender ? 'turnNameAttacksYouNext' : 'turnNameAttacks', { name: name(view.attackerId) }),
           mine: false,
+          echo: true,
         };
   }
   // „Nur Nachbarn“: wer gegenüber sitzt, schaut bei dieser Runde nur zu
@@ -35,7 +39,7 @@ export function turnInfo(view: GameView): { text: string; mine: boolean } {
   if (view.table.some((t) => !t.defense)) {
     return isDefender
       ? { text: t('turnYouDefend'), mine: true }
-      : { text: t('turnNameDefends', { name: name(view.defenderId) }), mine: false };
+      : { text: t('turnNameDefends', { name: name(view.defenderId) }), mine: false, echo: true };
   }
   if (isDefender) return { text: t('turnAllBeatenWait'), mine: false };
   if (sidelined) return { text: t('turnAllBeatenNeighbors'), mine: false };
