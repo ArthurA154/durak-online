@@ -373,7 +373,10 @@ describe('Bots', () => {
     expect(() => rooms.addBot(room, b.playerId)).toThrow('Nur der Gastgeber');
     rooms.addBot(room, session.playerId);
     rooms.addBot(room, session.playerId);
-    expect(room.players.map((p) => p.name)).toEqual(['Anna', 'Ben', '🤖 Iwan', '🤖 Olga']);
+    const bots = room.players.slice(2);
+    expect(bots.every((p) => p.bot && p.name.startsWith('🤖 '))).toBe(true);
+    expect(new Set(bots.map((p) => p.name)).size).toBe(2); // nie doppelt
+    expect(new Set(room.players.map((p) => p.color)).size).toBe(4); // jede Farbe nur einmal
     expect(() => rooms.addBot(room, session.playerId)).toThrow('voll');
     // Bot wieder rauswerfen geht wie bei Menschen
     rooms.kickFromLobby(room, session.playerId, room.players[3].id);
@@ -411,10 +414,13 @@ describe('Bots', () => {
     const { room, session } = rooms.create('Anna', 0, 's1', true);
     rooms.addBot(room, session.playerId);
     rooms.addBot(room, session.playerId);
-    rooms.addBot(room, session.playerId);
+    const last = rooms.addBot(room, session.playerId);
     expect(rooms.openLobbies()[0]).toMatchObject({ players: 4, bots: 3 });
     rooms.join(room.code, 'Ben', 1, 's2');
-    expect(room.players.map((p) => p.name)).toEqual(['Anna', '🤖 Iwan', '🤖 Olga', 'Ben']);
+    // der zuletzt hinzugefügte Bot macht Platz
+    expect(room.players).toHaveLength(4);
+    expect(room.players.map((p) => p.name)).not.toContain(last.name);
+    expect(room.players.at(-1)!.name).toBe('Ben');
   });
 
   it('geht der letzte Mensch, verschwinden auch die Bots', () => {

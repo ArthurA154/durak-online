@@ -92,7 +92,29 @@ export interface RoomEvents {
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const BOT_NAMES = ['🤖 Iwan', '🤖 Olga', '🤖 Pjotr', '🤖 Sweta', '🤖 Mischa'];
+/** Namen für Bots – zufällig, im Raum nie doppelt */
+const BOT_NAMES = [
+  'Iwan',
+  'Olga',
+  'Pjotr',
+  'Sweta',
+  'Mischa',
+  'Dascha',
+  'Boris',
+  'Katja',
+  'Sascha',
+  'Nadja',
+  'Kolja',
+  'Lena',
+  'Wowa',
+  'Galja',
+  'Fedja',
+  'Mascha',
+  'Tolik',
+  'Ljuba',
+].map((n) => `🤖 ${n}`);
+/** Schnurrbart bekommen Bots nicht */
+const BOT_MOUTHS = LOOK_MOUTHS.map((_, i) => i).filter((i) => LOOK_MOUTHS[i] !== 'handlebar');
 /** Denkpause eines Bots vor seinem Zug – länger als jede Karten-Animation, wirkt wie ein Mensch */
 const BOT_DELAY_MS = [1300, 2200] as const;
 
@@ -112,6 +134,11 @@ const isHuman = (p: RoomPlayer) => !p.bot;
 /** Verbunden – Bots sind es immer */
 const present = (p: RoomPlayer) => !!p.bot || p.socketId !== null;
 const randomInt = (n: number) => Math.floor(Math.random() * n);
+/** Zufälliges Element – aus `free`, solange es dort etwas gibt, sonst aus allen */
+const pick = <T>(all: T[], free: T[]): T => {
+  const from = free.length ? free : all;
+  return from[randomInt(from.length)];
+};
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -278,17 +305,26 @@ export class RoomManager {
     if (room.hostId !== byId) throw new GameError('Nur der Gastgeber kann Bots hinzufügen');
     if (isRunning(room)) throw new GameError('Erst nach der Partie');
     if (room.players.length >= MAX_PLAYERS) throw new GameError('Der Raum ist voll');
-    const taken = new Set(room.players.map((p) => p.name));
+    const names = new Set(room.players.map((p) => p.name));
+    const colors = new Set(room.players.map((p) => p.color));
+    const allColors = AVATAR_COLORS.map((_, i) => i);
     const bot: RoomPlayer = {
       id: randomUUID(),
-      name: BOT_NAMES.find((n) => !taken.has(n)) ?? '🤖 Bot',
+      name: pick(
+        BOT_NAMES,
+        BOT_NAMES.filter((n) => !names.has(n)),
+      ),
       token: randomUUID(),
       socketId: null,
       awaySince: null,
-      color: randomInt(AVATAR_COLORS.length),
+      // Farbe, die im Raum noch niemand hat
+      color: pick(
+        allColors,
+        allColors.filter((c) => !colors.has(c)),
+      ),
       look: cleanLook({
         eyes: randomInt(LOOK_EYES.length),
-        mouth: randomInt(LOOK_MOUTHS.length),
+        mouth: pick(BOT_MOUTHS, BOT_MOUTHS),
         hat: randomInt(LOOK_HATS.length),
       }),
       durakCount: 0,
