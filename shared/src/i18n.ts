@@ -145,9 +145,29 @@ export function translateServer(message: string, lang: Lang): string {
   return message;
 }
 
-/** Schnellsprüche je Sprache – in öffentlichen Räumen die einzigen erlaubten Nachrichten */
-export const QUICK_BY_LANG: Record<Lang, string[]> = {
-  de: ['😂', '👍', 'GG', 'Schluck!', 'Glück gehabt 🍀', 'Warte nur …', 'Ну ты дурак 😂'],
-  en: ['😂', '👍', 'GG', 'Take it!', 'Lucky 🍀', 'Just wait …', 'Ну ты дурак 😂'],
-  ru: ['😂', '👍', 'GG', 'Бери!', 'Повезло 🍀', 'Ну погоди …', 'Ну ты дурак 😂'],
+/**
+ * Schnellsprüche – verschickt wird nur die Kennung, jeder liest sie in seiner Sprache.
+ * In öffentlichen Räumen die einzigen erlaubten Nachrichten.
+ */
+export const QUICK: Record<string, Record<Lang, string>> = {
+  hi: { de: 'Hallo 👋', en: 'Hi 👋', ru: 'Привет 👋' },
+  laugh: { de: '😂', en: '😂', ru: '😂' },
+  thumbs: { de: '👍', en: '👍', ru: '👍' },
+  gg: { de: 'GG', en: 'GG', ru: 'GG' },
+  take: { de: 'Schluck!', en: 'Take it!', ru: 'Бери!' },
+  bito: { de: 'Bito! 😎', en: 'Bito! 😎', ru: 'Бито! 😎' },
+  lucky: { de: 'Glück gehabt 🍀', en: 'Lucky 🍀', ru: 'Повезло 🍀' },
+  nice: { de: 'Nicht schlecht 👏', en: 'Nice one 👏', ru: 'Неплохо 👏' },
+  hurry: { de: 'Schneller! ⏰', en: 'Hurry up! ⏰', ru: 'Быстрее! ⏰' },
+  wait: { de: 'Warte nur …', en: 'Just wait …', ru: 'Ну погоди …' },
+  rematch: { de: 'Revanche?', en: 'Rematch?', ru: 'Реванш?' },
+  // bleibt absichtlich russisch – der Klassiker
+  durak: { de: 'Ну ты дурак 😂', en: 'Ну ты дурак 😂', ru: 'Ну ты дурак 😂' },
 };
+
+/** Text eines Schnellspruchs in einer Sprache (unbekannte Kennung → leer) */
+export const quickText = (id: string, lang: Lang): string => QUICK[id]?.[lang] ?? '';
+
+/** Kennung zu einem Spruch-Text in irgendeiner Sprache (für ältere Clients, die noch Text schicken) */
+export const quickIdOf = (text: string): string | undefined =>
+  Object.keys(QUICK).find((id) => LANGS.some((l) => QUICK[id][l] === text));

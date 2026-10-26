@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { LANGS, translateServer, type Lang } from '@durak/shared';
+import { LANGS, quickText, translateServer, type ChatMessage, type Lang } from '@durak/shared';
 
 // Übersetzungen der Oberfläche. Deutsch ist die Vorlage – Englisch und Russisch müssen
 // dieselben Schlüssel haben (prüft TypeScript). Platzhalter: {name}, {n} …
@@ -71,7 +71,6 @@ const de = {
   youAttack: 'greifst an',
   youDefend: 'verteidigst',
   youTake: 'schluckst',
-  youCap: 'Du',
   host: 'Gastgeber',
   addBot: '+ Bot',
   botsN: 'Bots: {n}',
@@ -281,7 +280,6 @@ const en: Record<Key, string> = {
   youAttack: 'attack',
   youDefend: 'defend',
   youTake: 'take',
-  youCap: 'You',
   host: 'host',
   addBot: '+ Bot',
   botsN: 'bots: {n}',
@@ -485,7 +483,6 @@ const ru: Record<Key, string> = {
   youAttack: 'ходишь',
   youDefend: 'отбиваешься',
   youTake: 'берёшь',
-  youCap: 'Ты',
   host: 'хозяин',
   addBot: '+ бот',
   botsN: 'боты: {n}',
@@ -674,6 +671,9 @@ export function t(key: Key, params: Record<string, string | number> = {}): strin
   const text = DICTS[lang][key] ?? de[key];
   return text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
 }
+
+/** Chat-Nachricht zum Anzeigen: Schnellsprüche in der eigenen Sprache, sonst der Text */
+export const messageText = (m: ChatMessage) => (m.quick && quickText(m.quick, lang)) || m.text;
 
 /** Meldung vom Server (immer Deutsch) in die aktuelle Sprache */
 export const serverText = (message: string) => translateServer(message, lang);

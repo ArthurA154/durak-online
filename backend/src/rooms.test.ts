@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AWAY_KICK_MS, THROW_IN_MS, TURN_MS, TURN_WARN_MS, type Card } from '@durak/shared';
 import { RoomManager, cleanChat, viewFor } from './rooms.js';
-import { CHAT_KEEP, CHAT_MAX } from '@durak/shared';
+import { CHAT_KEEP, CHAT_MAX, quickText } from '@durak/shared';
 
 describe('Zug-Timer im Raum', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -345,6 +345,19 @@ describe('Öffentliche Räume und Einstellungen', () => {
     const { room, session } = rooms.create('Anna', 0, 's1', true);
     expect(rooms.chat(room, session.playerId, 'GG').text).toBe('GG');
     expect(() => rooms.chat(room, session.playerId, 'hallo')).toThrow('Schnellsprüche');
+    expect(() => rooms.chat(room, session.playerId, { quick: 'gibtsnicht' })).toThrow('Schnellsprüche');
+  });
+
+  it('Schnellsprüche gehen als Kennung raus – jeder liest sie in seiner Sprache', () => {
+    const rooms = new RoomManager();
+    const { room, session } = rooms.create('Anna', 0, 's1');
+    const msg = rooms.chat(room, session.playerId, { quick: 'lucky' });
+    expect(msg).toMatchObject({ quick: 'lucky', text: 'Glück gehabt 🍀' });
+    expect(quickText(msg.quick!, 'ru')).toBe('Повезло 🍀');
+    // älterer Browser schickt noch den Text (z. B. auf Russisch) → wird erkannt
+    expect(rooms.chat(room, session.playerId, 'Повезло 🍀').quick).toBe('lucky');
+    // freier Text bleibt Text
+    expect(rooms.chat(room, session.playerId, { text: 'hallo' }).quick).toBeUndefined();
   });
 });
 

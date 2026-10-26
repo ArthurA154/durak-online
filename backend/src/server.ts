@@ -330,7 +330,7 @@ io.on('connection', (socket: IoSocket) => {
 
   on('chat:send', (raw, ack) =>
     social(ack, chatLimit, (room, id) => {
-      toRoom(room, 'chat', rooms.chat(room, id, obj(raw).text));
+      toRoom(room, 'chat', rooms.chat(room, id, obj(raw)));
       stats.chat();
     }),
   );

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { CHAT_MAX, QUICK_BY_LANG } from '@durak/shared';
+import { CHAT_MAX, QUICK, quickText } from '@durak/shared';
 import { colorOf } from './Avatar';
 import { call, socket } from './socket';
 import { getChat, setChatOpen, subscribeChat } from './social';
 import { unlockAudio } from './audio';
-import { getLang, t } from './i18n';
+import { getLang, messageText, t } from './i18n';
 
 /** 💬-Knopf in der Kopfleiste und das Chatfenster darunter. */
 export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
@@ -43,18 +43,16 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
     return () => clearTimeout(t);
   }, [error]);
 
-  const send = (msg: string) => {
-    const clean = msg.trim();
-    if (!clean) return;
+  const send = (msg: { text: string } | { quick: string }) => {
     unlockAudio();
-    call((ack) => socket.emit('chat:send', { text: clean }, ack))
-      .then(() => setText(''))
+    call((ack) => socket.emit('chat:send', msg, ack))
+      .then(() => 'text' in msg && setText(''))
       .catch((e: Error) => setError(e.message));
   };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    send(text);
+    if (text.trim()) send({ text: text.trim() });
   };
 
   return (
@@ -75,16 +73,29 @@ export function Chat({ me, quickOnly }: { me: string; quickOnly: boolean }) {
         <div ref={panelRef} className="chat-panel" role="dialog" aria-label={t('chat')}>
           <ol ref={logRef} className="chat-log" aria-live="polite">
             {chat.messages.length === 0 && <li className="chat-empty">{t('chatEmpty')}</li>}
-            {chat.messages.map((m) => (
-              <li key={m.id} className={m.from === me ? 'mine' : undefined}>
-                <b style={{ color: colorOf(m.color) }}>{m.from === me ? t('youCap') : m.name}</b> {m.text}
-              </li>
-            ))}
+            {chat.messages.map((m, i) => {
+              const mine = m.from === me;
+              // Name nur über der ersten Nachricht einer Folge vom selben Absender
+              const first = i === 0 || chat.messages[i - 1].from !== m.from;
+              const shown = messageText(m);
+              // nur Emoji (keine Buchstaben/Zahlen) → groß und ohne Blase
+              const emoji = shown.length <= 8 && !/[\p{L}\p{N}]/u.test(shown);
+              return (
+                <li key={m.id} className={`msg${mine ? ' mine' : ''}${first ? ' first' : ''}${emoji ? ' emoji' : ''}`}>
+                  {first && !mine && (
+                    <b className="msg-name" style={{ color: colorOf(m.color) }}>
+                      {m.name}
+                    </b>
+                  )}
+                  <span className="msg-text">{shown}</span>
+                </li>
+              );
+            })}
           </ol>
           <div className="chat-quick">
-            {QUICK_BY_LANG[getLang()].map((q) => (
-              <button key={q} type="button" onClick={() => send(q)}>
-                {q}
+            {Object.keys(QUICK).map((id) => (
+              <button key={id} type="button" onClick={() => send({ quick: id })}>
+                {quickText(id, getLang())}
               </button>
             ))}
           </div>

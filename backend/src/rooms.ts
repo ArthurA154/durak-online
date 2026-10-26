@@ -6,7 +6,8 @@ import {
   AWAY_KICK_MS,
   CHAT_KEEP,
   CHAT_MAX,
-  QUICK_PHRASES,
+  QUICK,
+  quickIdOf,
   type OpenLobby,
   type RoomSettings,
   THROW_ITEMS,
@@ -250,16 +251,29 @@ export class RoomManager {
     return { room, session: sessionOf(room, player), previousSocketId };
   }
 
-  /** Chat-Nachricht eines Spielers im Raum */
+  /**
+   * Chat-Nachricht eines Spielers im Raum: freier Text oder ein Schnellspruch (`{ quick: 'lucky' }`).
+   * Ein Schnellspruch wird als Kennung verschickt – jeder liest ihn in seiner Sprache.
+   */
   chat(room: Room, playerId: string, raw: unknown, now = Date.now()): ChatMessage {
     const p = room.players.find((x) => x.id === playerId);
     if (!p) throw new GameError('Du bist nicht in diesem Raum');
-    const text = cleanChat(raw);
-    if (!text) throw new GameError('Leere Nachricht');
-    if (room.settings.public && !QUICK_PHRASES.includes(text)) {
-      throw new GameError('In öffentlichen Räumen gehen nur Schnellsprüche');
-    }
-    const msg: ChatMessage = { id: ++seq, from: p.id, name: p.name, color: p.color, text, at: now };
+    const input = (raw && typeof raw === 'object' ? raw : { text: raw }) as { text?: unknown; quick?: unknown };
+    const text = cleanChat(input.text);
+    // Kennung direkt, oder ein Text, der einem Spruch entspricht (ältere Browser schicken noch Text)
+    const quick =
+      typeof input.quick === 'string' && Object.hasOwn(QUICK, input.quick) ? input.quick : text && quickIdOf(text);
+    if (room.settings.public && !quick) throw new GameError('In öffentlichen Räumen gehen nur Schnellsprüche');
+    if (!quick && !text) throw new GameError('Leere Nachricht');
+    const msg: ChatMessage = {
+      id: ++seq,
+      from: p.id,
+      name: p.name,
+      color: p.color,
+      text: quick ? QUICK[quick].de : text,
+      ...(quick ? { quick } : {}),
+      at: now,
+    };
     room.chat.push(msg);
     if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP);
     return msg;

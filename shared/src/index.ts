@@ -1,6 +1,5 @@
 // Gemeinsame Typen und Hilfsfunktionen für Frontend und Backend.
 
-import { QUICK_BY_LANG } from './i18n';
 export * from './i18n';
 
 export const SUITS = ['S', 'H', 'D', 'C'] as const; // Pik, Herz, Karo, Kreuz
@@ -258,8 +257,6 @@ export interface Session {
 
 export const CHAT_MAX = 120;
 
-/** Alle Schnellsprüche (jede Sprache) – in öffentlichen Räumen die einzigen erlaubten Nachrichten */
-export const QUICK_PHRASES = [...new Set(Object.values(QUICK_BY_LANG).flat())];
 /** So viele Nachrichten merkt sich ein Raum */
 export const CHAT_KEEP = 50;
 
@@ -269,7 +266,10 @@ export interface ChatMessage {
   name: string;
   /** Index in AVATAR_COLORS */
   color: number;
+  /** Freier Text – bei Schnellsprüchen der deutsche Text (Ersatz) */
   text: string;
+  /** Schnellspruch-Kennung: jeder zeigt ihn in seiner eigenen Sprache an */
+  quick?: string;
   at: number;
 }
 
@@ -311,7 +311,8 @@ export interface ClientToServerEvents {
   'game:pass': (ack: (r: Result) => void) => void;
   /** Getrennten Spieler nach der Pause aus dem Raum entfernen */
   'game:kick': (p: { playerId: string }, ack: (r: Result) => void) => void;
-  'chat:send': (p: { text: string }, ack: (r: Result) => void) => void;
+  /** Freier Text oder ein Schnellspruch (Kennung aus QUICK) */
+  'chat:send': (p: { text?: string; quick?: string }, ack: (r: Result) => void) => void;
   /** Etwas auf einen Mitspieler werfen */
   throw: (p: { to: string; item: ThrowItem }, ack: (r: Result) => void) => void;
 }

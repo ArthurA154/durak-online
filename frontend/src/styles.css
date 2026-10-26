@@ -193,7 +193,9 @@ body {
   color: rgba(0, 0, 0, 0.35);
 }
 
-.draw-flyer {
+/* Karte, die beim Austeilen/Nachziehen zu einem Mitspieler fliegt – frei über allem.
+   Doppelte Klasse, sonst gewinnt das spätere `.card { position: relative }` und sie landet unter dem Spiel. */
+.card.draw-flyer {
   position: fixed;
   z-index: 90;
   pointer-events: none;
@@ -2679,8 +2681,8 @@ input:focus {
   top: 60px;
   right: 12px;
   z-index: 120;
-  width: min(340px, calc(100vw - 24px));
-  max-height: min(62dvh, 480px);
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70dvh, 560px);
   display: flex;
   flex-direction: column;
   border-radius: 18px;
@@ -2693,21 +2695,62 @@ input:focus {
   flex: 1;
   min-height: 90px;
   margin: 0;
-  padding: 12px 14px 6px;
+  padding: 12px 12px 8px;
   list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 3px;
   font-size: 0.92rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
-.chat-log b {
+/* Nachrichten wie im Messenger: andere links, eigene rechts in Gelb */
+.msg {
+  display: grid;
+  justify-items: start;
+  max-width: 85%;
+}
+
+.msg.first {
+  margin-top: 6px;
+}
+
+.msg.first:first-child {
+  margin-top: 0;
+}
+
+.msg.mine {
+  justify-self: end;
+  justify-items: end;
+}
+
+.msg-name {
+  margin: 0 0 2px 10px;
+  font-size: 0.75rem;
   font-weight: 800;
-  margin-right: 4px;
+}
+
+.msg-text {
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+
+.msg.mine .msg-text {
+  background: var(--yellow);
+  color: #1b1600;
+}
+
+/* Nur Emoji: groß, ohne Blase */
+.msg.emoji .msg-text {
+  padding: 0 4px;
+  background: none;
+  font-size: 1.8rem;
+  line-height: 1.15;
 }
 
 .chat-empty {
@@ -2715,27 +2758,24 @@ input:focus {
   font-size: 0.85rem;
 }
 
+/* Schnellsprüche: brechen um statt aus dem Fenster zu laufen */
 .chat-quick {
   display: flex;
-  gap: 6px;
-  padding: 6px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.chat-quick::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 12px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .chat-quick button {
   flex: none;
-  padding: 6px 11px;
+  padding: 5px 9px;
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
 }

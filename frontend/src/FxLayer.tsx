@@ -3,7 +3,7 @@ import type { ThrowEvent, ThrowItem } from '@durak/shared';
 import { call, socket } from './socket';
 import { onMessage, onThrow } from './social';
 import { sfx, unlockAudio } from './audio';
-import { t } from './i18n';
+import { messageText, t } from './i18n';
 
 // Alles, was über dem Tisch „schwebt“: Sprechblasen, das Wurf-Menü, fliegende Sachen und Treffer.
 // Liegt als eigene Ebene über allem und sucht die Figuren über [data-seat="<id>"] .avatar –
@@ -67,7 +67,7 @@ export function FxLayer({ me }: { me: string }) {
       onMessage((m) => {
         if (m.from !== me) sfx.chat();
         // pro Spieler nur eine Blase – die neue ersetzt die alte
-        setBubbles((b) => [...b.filter((x) => x.from !== m.from), { key: m.id, from: m.from, text: m.text }]);
+        setBubbles((b) => [...b.filter((x) => x.from !== m.from), { key: m.id, from: m.from, text: messageText(m) }]);
         setTimeout(() => setBubbles((b) => b.filter((x) => x.key !== m.id)), BUBBLE_MS);
       }),
     [me],
